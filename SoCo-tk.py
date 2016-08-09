@@ -128,12 +128,7 @@ class SonosList(tk.PanedWindow):
         self.destroy()
 
     def get_speaker_ips(self):
-        disc = None
-        try:
-            disc = soco.SonosDiscovery()
-            return disc.get_speaker_ips()
-        finally:
-            if disc: del disc
+        return [s.ip_address for s in soco.discover()]
 
     def scanSpeakers(self):
         ips = self.get_speaker_ips()
@@ -141,6 +136,8 @@ class SonosList(tk.PanedWindow):
         speakers = []
         for ip in ips:
             speaker = WrappedSoCo(ip)
+            speaker.speaker_ip = ip
+            speaker.get_speaker_info()
             if not speaker.speaker_info:
                 logging.warning('Speaker %s does not have any info (probably a bridge), skipping...', ip)
                 continue
@@ -426,9 +423,9 @@ class SonosList(tk.PanedWindow):
 
         selection = widget.curselection()
         if not selection:
-            self.showSpeakerInfo(None)            
-            self._updateButtons()
-            self.__setConfig('last_selected', None)
+            #self.showSpeakerInfo(None)            
+            #self._updateButtons()
+            #self.__setConfig('last_selected', None)
             return
 
         index = int(selection[0])
@@ -460,7 +457,7 @@ class SonosList(tk.PanedWindow):
         self._infoWidget['volume'].config(state = newState)
         
         if speaker is None:
-            self.__clearQueue()
+            #self.__clearQueue()
             for info in self._infoWidget.keys():
                 if info == 'volume':
                     self._infoWidget[info].set(0)
@@ -481,7 +478,7 @@ class SonosList(tk.PanedWindow):
             track = speaker.get_current_track_info()
             playingTrack = track['uri']
 
-            track['volume'] = speaker.volume()
+            track['volume'] = speaker.volume
             
             self.__clear('album_art')
             for info, value in track.items():
@@ -517,13 +514,13 @@ class SonosList(tk.PanedWindow):
 
                 logging.debug('Inserting items (%d) to listbox', len(queue))
                 for index, item in enumerate(queue):
-                    string = self.labelQueue % item
+                    string = self.labelQueue % { 'artist': item.creator, 'title': item.title }
                     self.__queueContent.append(item)
                     self._queuebox.insert(tk.END, string)
 
             if playingTrack is not None:
                 for index, item in enumerate(self.__queueContent):
-                    if item['uri'] == playingTrack:
+                    if item.resources[0].uri == playingTrack:
                         self._queuebox.selection_clear(0, tk.END)
                         self._queuebox.selection_anchor(index)
                         self._queuebox.selection_set(index)
