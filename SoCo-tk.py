@@ -89,6 +89,8 @@ class SonosList(tk.PanedWindow):
         self.__lastSelected = None
         self.__lastImage = None
         self.__currentSpeaker = None
+        self.__speakers = []
+        self.__speakerId = tk.StringVar()
         self._connection = None
 
         self.empty_info = '-'
@@ -96,9 +98,6 @@ class SonosList(tk.PanedWindow):
 
         self._createWidgets()
         self._createMenu()
-
-##        self.sash_place(0,150,400)
-##        self.sash_place(1,400,400)
 
         parent.rowconfigure(0, weight = 1)
         parent.columnconfigure(0, weight = 1)
@@ -182,9 +181,9 @@ class SonosList(tk.PanedWindow):
 
     def __addSpeakers(self, speakers):
         logging.debug('Deleting all items from list')
-        self._listbox.delete(0, tk.END)
-        del self.__listContent[:]
-        self.__listContent = []
+        
+        self._speakermenu.delete(0, len(speakers))
+        self._speakers = []
 
         if not speakers:
             logging.debug('No speakers to add, returning')
@@ -192,14 +191,13 @@ class SonosList(tk.PanedWindow):
         
         logging.debug('Inserting new items (%d)', len(speakers))
         for speaker in speakers:
-            self.__listContent.append(speaker)
-            self._listbox.insert(tk.END, speaker)
+            self._speakers.append(speaker)
+            text = "%s (%s)" % (speaker.player_name, speaker.ip_address)
+            self._speakermenu.add_radiobutton(label=text, value=speaker.uid, variable=self.__speakerId,
+                                              command=self._selectSpeaker)
         
     def _createWidgets(self):
         logging.debug('Creating widgets')
-        # Left frame
-        self._left = tk.Frame(self)
-        self.add(self._left)
                           
         # Center frame
         self._center = tk.Frame(self)
@@ -208,20 +206,6 @@ class SonosList(tk.PanedWindow):
         # Right frame
         self._right = tk.Frame(self)
         self.add(self._right)
-
-        # Create Sonos list
-        self._listbox = tk.Listbox(self._left,
-                                   selectmode = tk.EXTENDED)
-
-        self._listbox.bind('<<ListboxSelect>>', self._listboxSelected)
-        
-        self._listbox.grid(row = 0,
-                           column = 0,
-                           columnspan = 5,
-                           padx = 5,
-                           pady = 5,
-                           sticky = 'news')
-
 
         # Create queue list
         scrollbar = tk.Scrollbar(self._right)
@@ -245,28 +229,17 @@ class SonosList(tk.PanedWindow):
 
         self._createButtons()
                           
-        self._left.rowconfigure(0, weight = 1)
-        self._left.columnconfigure(0, weight = 1)
-
-        self._center.rowconfigure(0, weight = 1)
-        self._center.columnconfigure(0, weight = 1)
-
         self._right.rowconfigure(0, weight = 1)
         self._right.columnconfigure(0, weight = 1)
 
         self._info = tk.Frame(self._center)
-        self._info.grid(row = 0,
-                        column = 0,
-                        padx = 5,
-                        pady = 5,
-                        sticky = 'news')
-
-        self._info.rowconfigure(9, weight = 1)
+        self._info.pack(side=tk.TOP, fill=tk.BOTH)
         self._info.columnconfigure(1, weight = 1)
 
         self._createInfoWidgets()
 
     def _createInfoWidgets(self):
+
         infoIndex = 0
 
         ###################################
@@ -364,21 +337,11 @@ class SonosList(tk.PanedWindow):
                                            sticky = 'nw')
 
     def __getSelectedSpeaker(self):
-        if self.__currentSpeaker:
-            return self.__currentSpeaker
-        
-        widget = self._listbox
+        return self.__currentSpeaker
 
-        selection = widget.curselection()
-        if not selection:
-            return None
-
-        index = int(selection[0])
-        
-        assert len(self.__listContent) > index
-        speaker = self.__listContent[index]
-
-        return speaker
+    def __setSelectedSpeaker(self, speaker):
+        self.__currentSpeaker = speaker
+        self.__parent.wm_title("SoCo - " + speaker.player_name)
 
     def __getSelectedQueueItem(self):
         widget = self._queuebox
@@ -417,26 +380,18 @@ class SonosList(tk.PanedWindow):
                 del self.__lastImage
                 self.__lastImage = None
         
-    def _listboxSelected(self, evt):
-        # Note here that Tkinter passes an event object to onselect()
-        widget = evt.widget
-
-        selection = widget.curselection()
-        if not selection:
-            #self.showSpeakerInfo(None)            
-            #self._updateButtons()
-            #self.__setConfig('last_selected', None)
-            return
-
-        index = int(selection[0])
-        
-        assert len(self.__listContent) > index
-        speaker = self.__listContent[index]
-
+    def _selectSpeaker(self):
+        speaker = None
+        for s in self._speakers:
+            if s.uid == self.__speakerId.get():
+                speaker = s
+        logging.info("Selecting: " + speaker.player_name)
+        logging.info("Current: " + self.__currentSpeaker.player_name)
         if speaker == self.__currentSpeaker:
             logging.info('Speaker already selected, skipping')
             return
         
+        self.__setSelectedSpeaker(speaker)
         self.showSpeakerInfo(speaker)
         self._updateButtons()
                 
@@ -451,8 +406,6 @@ class SonosList(tk.PanedWindow):
            speaker is not None:
             raise TypeError('Unsupported type: %s', type(speaker))
 
-        self.__currentSpeaker = speaker
-        
         newState = tk.ACTIVE if speaker is not None else tk.DISABLED
         self._infoWidget['volume'].config(state = newState)
         
@@ -619,56 +572,37 @@ class SonosList(tk.PanedWindow):
         
     def _createButtons(self):
         logging.debug('Creating buttons')
-        buttonIndex = 0
         buttonWidth = 2
         
-        button_prev = tk.Button(self._left,
+        panel = tk.Frame(self._center)
+        button_prev = tk.Button(panel,
                                 width = buttonWidth,
                                 command = self.__previous,
                                 text = '<<')
-        button_prev.grid(row = 1,
-                         column = buttonIndex,
-                         padx = 5,
-                         pady = 5,
-                         sticky = 'w')
+        button_prev.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['previous'] = button_prev
-        buttonIndex += 1
 
-        button_pause = tk.Button(self._left,
+        button_pause = tk.Button(panel,
                                  width = buttonWidth,
                                  command = self.__pause,
                                  text = '||')
-        button_pause.grid(row = 1,
-                          column = buttonIndex,
-                          padx = 5,
-                          pady = 5,
-                          sticky = 'w')
+        button_pause.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['pause'] = button_pause
-        buttonIndex += 1
 
-        button_play = tk.Button(self._left,
+        button_play = tk.Button(panel,
                                  width = buttonWidth,
                                  command = self.__play,
                                  text = '>')
-        button_play.grid(row = 1,
-                         column = buttonIndex,
-                         padx = 5,
-                         pady = 5,
-                         sticky = 'w')
+        button_play.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['play'] = button_play
-        buttonIndex += 1
 
-        button_next = tk.Button(self._left,
+        button_next = tk.Button(panel,
                                 width = buttonWidth,
                                 command = self.__next,
                                 text = '>>')
-        button_next.grid(row = 1,
-                         column = buttonIndex,
-                         padx = 5,
-                         pady = 5,
-                         sticky = 'w')
+        button_next.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['next'] = button_next
-        buttonIndex += 1
+        panel.pack(side=tk.BOTTOM)
 
     def _createMenu(self):
         logging.debug('Creating menu')
@@ -685,6 +619,9 @@ class SonosList(tk.PanedWindow):
         self._filemenu.add_command(label="Exit",
                                    command=self._cleanExit)
 
+        self._speakermenu = tk.Menu(self._menubar, tearoff=0)
+        self._menubar.add_cascade(label="Speaker", menu=self._speakermenu)
+        
         # Playback menu
         self._playbackmenu = tk.Menu(self._menubar, tearoff=0)
         self._menubar.add_cascade(label="Playback", menu=self._playbackmenu)
@@ -783,6 +720,11 @@ class SonosList(tk.PanedWindow):
                 logging.error('Could not set window geometry')
                 logging.error(traceback.format_exc())
 
+        #sashes = self.__getConfig('sash_coordinates')
+        #if sashes:
+        #    (index, x, y) = sashes.split(':')
+        #    self.sash_place(int(index), int(x), int(y))
+
         # Load speakers
         speakers = self._loadSpeakers()
         if speakers:
@@ -797,36 +739,15 @@ class SonosList(tk.PanedWindow):
 
         # Load last selected speaker
         selected_speaker_uid = self.__getConfig('last_selected')
+        self.__speakerId.set(selected_speaker_uid)
         logging.debug('Last selected speaker: %s', selected_speaker_uid)
 
-        selectIndex = None
-        selectSpeaker = None
-        for index, speaker in enumerate(self.__listContent):
-            if speaker.speaker_info['uid'] == selected_speaker_uid:
-                selectIndex = index
-                selectSpeaker = speaker
-                break
+        for speaker in speakers:
+            if speaker.uid == selected_speaker_uid:
+                self.__setSelectedSpeaker(speaker)
+                self.showSpeakerInfo(self.__currentSpeaker)
 
-        if selectIndex is not None:
-            self._listbox.selection_anchor(selectIndex)
-            self._listbox.selection_set(selectIndex)
-            self._listbox.see(selectIndex)
-            self.showSpeakerInfo(speaker)
-
-##        # Load sash_coordinates
-##        sashes = self.__getConfig('sash_coordinates')
-##        if sashes:
-##            for sash_info in sashes.split(','):
-##                if len(sash_info) < 1: continue
-##                try:
-##                    logging.debug('Setting sash: "%s"' % sash_info)
-##                    index, x, y = map(int, sash_info.split(':'))
-##                    self.sash_place(index, x, y)
-##                except:
-##                    logging.error('Could not set sash: "%s"' % sash_info)
-##                    logging.error(traceback.format_exc())
-##
-##            
+        self._updateButtons()
 
     def _storeSpeakers(self, speakers):
         logging.debug('Removing old speakers')
