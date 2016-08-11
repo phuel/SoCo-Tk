@@ -80,7 +80,6 @@ class SonosList(tk.PanedWindow):
                   ipady = 5,
                   sticky = 'news')
 
-        self.__listContent = []
         self.__queueContent = []
 
         self._controlButtons = {}
@@ -109,11 +108,11 @@ class SonosList(tk.PanedWindow):
 
     def destroy(self):
         try:
-            del self.__listContent[:]
             del self.__queueContent[:]
-            if self.__currentSpeaker:
-                del self.__currentSpeaker
-                self.__currentSpeaker = None
+            for speaker in self.__speakers:
+                del speaker
+            self.__speakers = []
+            self.__currentSpeaker = None
 
             if self._connection:
                 logging.info('Closing database connection')
@@ -720,11 +719,6 @@ class SonosList(tk.PanedWindow):
                 logging.error('Could not set window geometry')
                 logging.error(traceback.format_exc())
 
-        #sashes = self.__getConfig('sash_coordinates')
-        #if sashes:
-        #    (index, x, y) = sashes.split(':')
-        #    self.sash_place(int(index), int(x), int(y))
-
         # Load speakers
         speakers = self._loadSpeakers()
         if speakers:
@@ -747,7 +741,19 @@ class SonosList(tk.PanedWindow):
                 self.__setSelectedSpeaker(speaker)
                 self.showSpeakerInfo(self.__currentSpeaker)
 
-        self._updateButtons()
+        # Load sash_coordinates
+        self.update_idletasks()
+        sashes = self.__getConfig('sash_coordinates')
+        if sashes:
+            for sash_info in sashes.split(','):
+                if len(sash_info) < 1: continue
+                try:
+                    logging.debug('Setting sash: "%s"' % sash_info)
+                    index, x, y = map(int, sash_info.split(':'))
+                    self.sash_place(index, x, y)
+                except:
+                    logging.error('Could not set sash: "%s"' % sash_info)
+                    logging.error(traceback.format_exc())
 
     def _storeSpeakers(self, speakers):
         logging.debug('Removing old speakers')
