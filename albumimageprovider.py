@@ -20,13 +20,15 @@ class AlbumImageProvider(object):
 
         try:
             raw_data = None
+            connectiom = None
             
             # Check for cached albumart
             if trackUri:
                 raw_data = self.__cache.tryGetImage(trackUri)
 
-            connectiom = None
             if raw_data is None:
+                if not imageUri:
+                    return None
                 logging.info('Could not find cached album art, loading from URL')
                 connection = urllib.urlopen(imageUri)
                 raw_data = connection.read()

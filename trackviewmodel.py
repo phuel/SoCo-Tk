@@ -14,11 +14,13 @@ class CurrentTrackViewModel(object):
         self["duration"] = self.__getTrackProperty(track, 'duration')
 
     def updateFromEvent(self, entry):
+        if not entry:
+            return
         self["uri"] = entry.resources[0].uri
         self["title"] = entry.title
         self["album"] = entry.album
         self["artist"] = entry.creator
-        self["album_art"] = entry.album_art_uri,
+        self["album_art"] = entry.album_art_uri
         self["duration"] = entry.resources[0].duration
         
     def __getitem__(self, key):
@@ -42,9 +44,9 @@ class QueueTrackViewModel(object):
     def __init__(self, entry):
         self.Uri = entry.resources[0].uri
         self.Title = entry.title
-        self.Album = entry.album,
+        self.Album = entry.album
         self.Artist = entry.creator
-        self.AlbumArt = entry.album_art_uri,
+        self.AlbumArt = entry.album_art_uri
         self.Duration = entry.resources[0].duration
 
     @property

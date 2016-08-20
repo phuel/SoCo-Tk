@@ -48,6 +48,9 @@ class PlayerViewModel(object):
             name = 'Unnamed'
         return name
 
+    def __del__(self):
+        del self.__soco
+    
     @staticmethod
     def get_speaker_ips():
         return [s.ip_address for s in soco.discover()]
