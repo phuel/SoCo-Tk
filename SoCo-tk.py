@@ -11,6 +11,7 @@ import platform, os
 from appsettings import AppSettings
 from playerviewmodel import PlayerViewModel 
 from albumimageprovider import AlbumImageProvider
+from progressmeter import Meter
 
 try:
     from PIL import Image, ImageTk
@@ -37,7 +38,7 @@ settings = AppSettings(USER_DATA)
 class CurrentTrackView(tk.Frame):
 
     def __init__(self, parent):
-        tk.Frame.__init__(self, parent, background="red")
+        tk.Frame.__init__(self, parent)
 
         self.columnconfigure(1, weight = 1)
 
@@ -116,6 +117,22 @@ class CurrentTrackView(tk.Frame):
                              columnspan = 2,
                              padx = 5,
                              pady = 5)
+        infoIndex += 1
+
+        ###################################
+        # Position
+        ###################################
+        label = tk.Label(self, text = 'Position:')
+        label.grid(row = infoIndex,
+                   column = 0,
+                   sticky = 'w')
+        
+        self._labels['position'] = Meter(self, fillcolor='darkgray', text="")
+        self._labels['position'].grid(row = infoIndex,
+                                      column = 1,
+                                      padx = 5,
+                                      pady = 5,
+                                      sticky = 'we')
  
     def clearImage(self):
         self.__showAlbumArt(None)
@@ -133,13 +150,27 @@ class CurrentTrackView(tk.Frame):
         self.clearImage()
 
     def __onPropertyChanged(self, propertyName, viewModel):
-        if propertyName in self._labels:
+        if propertyName == 'position':
+            if viewModel['duration'] and viewModel['position']:
+                showHours = viewModel['duration'].seconds > 3600
+                position = self.__formatDuration(viewModel['position'], showHours) + " / " + self.__formatDuration(viewModel['duration'], showHours)
+                self._labels[propertyName].set(value=viewModel['position'].total_seconds() / viewModel['duration'].total_seconds(), text=position)
+            else:
+                self._labels[propertyName].set(value=0, text="")
+        elif propertyName in self._labels:
             value = viewModel[propertyName]
             self._labels[propertyName].configure(text=value)
         elif propertyName == 'album_art':
             image = self.__images.getImage(viewModel['uri'], viewModel['album_art'])
             self.__showAlbumArt(image)
     
+    def __formatDuration(self, time, showHours):
+        hours, remainder = divmod(time.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60) 
+        if showHours:
+            return "%d:%02d:%02d" % (hours, minutes, seconds)
+        return "%d:%02d" % (minutes, seconds)
+
     def __showAlbumArt(self, image):
         if image is None:
             self._album_art.config(image = None)
@@ -163,6 +194,11 @@ class SonosList(tk.PanedWindow):
 
         self.__parent.protocol('WM_DELETE_WINDOW', self._cleanExit)
         
+        parent.rowconfigure(0, weight = 1)
+        parent.columnconfigure(0, weight = 1)
+        self.rowconfigure(0, weight = 1)
+        self.columnconfigure(0, weight = 1)
+
         self.grid(row = 0,
                   column = 0,
                   ipadx = 5,
@@ -183,13 +219,7 @@ class SonosList(tk.PanedWindow):
         self._createWidgets()
         self._createMenu()
 
-        parent.rowconfigure(0, weight = 1)
-        parent.columnconfigure(0, weight = 1)
-        self.rowconfigure(0, weight = 1)
-        self.columnconfigure(0, weight = 1)
-
         self._loadSettings()
-        self._updateButtons()
 
     def destroy(self):
         try:
@@ -229,33 +259,6 @@ class SonosList(tk.PanedWindow):
         self.__addSpeakers(speakers)
         return speakers
 
-    def _cleanExit(self):
-        try:
-            geometry = self.__parent.geometry()
-            if geometry:
-                logging.debug('Storing geometry: "%s"', geometry)
-                settings.setConfig('window_geometry', geometry)
-
-            listOfPanes = self.panes()
-            sashes = []
-            for index in range(len(listOfPanes) - 1):
-                x, y = self.sash_coord(index)
-                sashes.append(':'.join((str(index),
-                                        str(x),
-                                        str(y))))
-
-            finalSashValue = ','.join(sashes)
-            logging.debug('Storing sashes: "%s"', finalSashValue)
-            settings.setConfig('sash_coordinates', finalSashValue)
-                
-        except:
-            logging.error('Error making clean exit')
-            logging.error(traceback.format_exc())
-        finally:
-            self.destroy()
-            self.__parent.quit()
-            
-
     def __addSpeakers(self, speakers):
         logging.debug('Deleting all items from list')
         
@@ -275,9 +278,9 @@ class SonosList(tk.PanedWindow):
     def _createWidgets(self):
         logging.debug('Creating widgets')
                           
-        # Center frame
-        self._center = tk.Frame(self)
-        self.add(self._center)
+        # Left frame
+        self._left = tk.Frame(self)
+        self.add(self._left)
 
         # Right frame
         self._right = tk.Frame(self)
@@ -325,13 +328,21 @@ class SonosList(tk.PanedWindow):
             self._showQueue(viewModel[propertyName])
         elif propertyName == 'volume':
             self._infoWidget['volume'].set(viewModel[propertyName])
+        elif propertyName == 'CanPlay':
+            self._updateButton('Play', viewModel[propertyName])
+        elif propertyName == 'CanPause':
+            self._updateButton('Pause', viewModel[propertyName])
+        elif propertyName == 'CanGoNext':
+            self._updateButton('Next', viewModel[propertyName])
+        elif propertyName == 'CanGoPrevious':
+            self._updateButton('Previous', viewModel[propertyName])
 
     def _createInfoWidgets(self):
         ###################################
         # Volume
         ###################################
         
-        panel = tk.Frame(self._center, background="green")
+        panel = tk.Frame(self._left)
         panel.columnconfigure(1, weight=1)
 
         label = tk.Label(panel, text = 'Volume:')
@@ -350,7 +361,7 @@ class SonosList(tk.PanedWindow):
         ###################################
         # Current track
         ###################################
-        self._currentTrackView = CurrentTrackView(self._center)
+        self._currentTrackView = CurrentTrackView(self._left)
         self._currentTrackView.pack(side=tk.TOP, fill=tk.BOTH)
 
     def __getSelectedSpeaker(self):
@@ -361,11 +372,16 @@ class SonosList(tk.PanedWindow):
             self.__currentSpeaker.unscubscribe()
             self.__currentSpeaker.removeListener(self.__onPropertyChanged)
             self._currentTrackView.detachViewModel()
+        self._disableButtons()
         self.__currentSpeaker = speaker
         if speaker:
             speaker.addListener(self.__onPropertyChanged)
             speaker.subscribe()
+            self._infoWidget['volume'].config(state = tk.ACTIVE)
             self._currentTrackView.attachViewModel(speaker.CurrentTrack)
+        else:
+            self._infoWidget['volume'].config(state = tk.DISABLED)
+            self._infoWidget['volume'].set(0)
         self.__showSpeakerAndState(speaker)
 
     def __showSpeakerAndState(self, speaker):
@@ -411,20 +427,11 @@ class SonosList(tk.PanedWindow):
             return
         
         self.__setSelectedSpeaker(speaker)
-        self.showSpeakerInfo(speaker)
-        self._updateButtons()
                 
         logging.debug('Zoneplayer: "%s"', speaker)
 
         logging.debug('Storing last_selected: %s' % speaker['uid'])
         settings.setConfig('last_selected', speaker['uid'])
-
-    def showSpeakerInfo(self, speaker):
-        if speaker is None:
-            self._infoWidget['volume'].config(state = tk.DISABLED)
-            self._infoWidget['volume'].set(0)
-        else:
-            self._infoWidget['volume'].config(state = tk.ACTIVE)
 
     def _showQueue(self, queue):
         logging.debug('Deleting old items')
@@ -440,20 +447,22 @@ class SonosList(tk.PanedWindow):
             self._queuebox.selection_anchor(index)
             self._queuebox.selection_set(index)
 
-    def _updateButtons(self):
-        logging.debug('Updating control buttons')
-        speaker = self.__getSelectedSpeaker()
-        
-        newState = tk.ACTIVE if speaker else tk.DISABLED
+    def _disableButtons(self):
+        newState = tk.DISABLED
         for (key,button) in self._controlButtons.items():
             button.config(state = newState)
             self._playbackmenu.entryconfigure(key, state=newState)
+        
+    def _updateButton(self, key, enabled):
+        newState = tk.ACTIVE if enabled else tk.DISABLED
+        self._controlButtons[key].configure(state=newState)
+        self._playbackmenu.entryconfigure(key, state=newState)
         
     def _createButtons(self):
         logging.debug('Creating buttons')
         buttonWidth = 2
         
-        panel = tk.Frame(self._center)
+        panel = tk.Frame(self._left)
         button_prev = tk.Button(panel,
                                 width = buttonWidth,
                                 command = self.__previous,
@@ -492,11 +501,8 @@ class SonosList(tk.PanedWindow):
         self._filemenu = tk.Menu(self._menubar, tearoff=0)
         self._menubar.add_cascade(label="File", menu=self._filemenu)
 
-        self._filemenu.add_command(label="Scan for speakers",
-                                   command=self.scanSpeakers)
-        
-        self._filemenu.add_command(label="Exit",
-                                   command=self._cleanExit)
+        self._filemenu.add_command(label="Scan for speakers", command=self.scanSpeakers)
+        self._filemenu.add_command(label="Exit", command=self._cleanExit)
 
         self._speakermenu = tk.Menu(self._menubar, tearoff=0)
         self._menubar.add_cascade(label="Speaker", menu=self._speakermenu)
@@ -505,17 +511,10 @@ class SonosList(tk.PanedWindow):
         self._playbackmenu = tk.Menu(self._menubar, tearoff=0)
         self._menubar.add_cascade(label="Playback", menu=self._playbackmenu)
 
-        self._playbackmenu.add_command(label = "Play",
-                                       command = self.__play)
-        
-        self._playbackmenu.add_command(label = "Pause",
-                                       command = self.__pause)
-        
-        self._playbackmenu.add_command(label = "Previous",
-                                       command = self.__previous)
-        
-        self._playbackmenu.add_command(label = "Next",
-                                       command = self.__next)
+        self._playbackmenu.add_command(label = "Play",     command = self.__play)
+        self._playbackmenu.add_command(label = "Pause",    command = self.__pause)
+        self._playbackmenu.add_command(label = "Previous", command = self.__previous)
+        self._playbackmenu.add_command(label = "Next",     command = self.__next)
 
     def _playSelectedQueueItem(self, evt):
         try:
@@ -528,7 +527,6 @@ class SonosList(tk.PanedWindow):
                 return
             
             speaker.play_from_queue(track_index)
-            self.showSpeakerInfo(speaker, refresh_queue = False)
         except:
             logging.error('Could not play queue item')
             logging.error(traceback.format_exc())
@@ -540,33 +538,25 @@ class SonosList(tk.PanedWindow):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
             raise SystemError('No speaker selected, this should not happend')
-
         speaker.previous()
-        self.showSpeakerInfo(speaker, refresh_queue = False)
         
     def __next(self):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
             raise SystemError('No speaker selected, this should not happend')
-
         speaker.next()
-        self.showSpeakerInfo(speaker, refresh_queue = False)
 
     def __pause(self):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
             raise SystemError('No speaker selected, this should not happend')
-
         speaker.pause()
-        self.showSpeakerInfo(speaker, refresh_queue = False)
 
     def __play(self):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
             raise SystemError('No speaker selected, this should not happend')
-
         speaker.play()
-        self.showSpeakerInfo(speaker, refresh_queue = False)
 
     def _loadSettings(self):
         # Load window geometry
@@ -578,19 +568,6 @@ class SonosList(tk.PanedWindow):
             except:
                 logging.error('Could not set window geometry')
                 logging.error(traceback.format_exc())
-
-        # Scan speakers
-        speakers = self.scanSpeakers()
-
-        # Load last selected speaker
-        selected_speaker_uid = settings.getConfig('last_selected')
-        self.__speakerId.set(selected_speaker_uid)
-        logging.debug('Last selected speaker: %s', selected_speaker_uid)
-
-        for speaker in speakers:
-            if speaker['uid'] == selected_speaker_uid:
-                self.__setSelectedSpeaker(speaker)
-                self.showSpeakerInfo(speaker)
 
         # Load sash_coordinates
         self.update_idletasks()
@@ -605,6 +582,44 @@ class SonosList(tk.PanedWindow):
                 except:
                     logging.error('Could not set sash: "%s"' % sash_info)
                     logging.error(traceback.format_exc())
+
+        # Scan speakers
+        speakers = self.scanSpeakers()
+
+        # Load last selected speaker
+        selected_speaker_uid = settings.getConfig('last_selected')
+        self.__speakerId.set(selected_speaker_uid)
+        logging.debug('Last selected speaker: %s', selected_speaker_uid)
+
+        for speaker in speakers:
+            if speaker['uid'] == selected_speaker_uid:
+                self.__setSelectedSpeaker(speaker)
+
+    def _cleanExit(self):
+        try:
+            geometry = self.__parent.geometry()
+            if geometry:
+                logging.debug('Storing geometry: "%s"', geometry)
+                settings.setConfig('window_geometry', geometry)
+
+            listOfPanes = self.panes()
+            sashes = []
+            for index in range(len(listOfPanes) - 1):
+                x, y = self.sash_coord(index)
+                sashes.append(':'.join((str(index),
+                                        str(x),
+                                        str(y))))
+
+            finalSashValue = ','.join(sashes)
+            logging.debug('Storing sashes: "%s"', finalSashValue)
+            settings.setConfig('sash_coordinates', finalSashValue)
+                
+        except:
+            logging.error('Error making clean exit')
+            logging.error(traceback.format_exc())
+        finally:
+            self.destroy()
+            self.__parent.quit()
 
 def main(root):
     logging.debug('Main')

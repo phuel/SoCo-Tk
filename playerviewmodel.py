@@ -35,11 +35,15 @@ class PlayerViewModel(ViewModelBase):
         
         self.__ipAddress = ip
         self.__subscriptions = []
-        self["CurrentState"] = None
-        self["uid"] = self.__soco.uid
+        self['CurrentState'] = None
+        self['uid'] = self.__soco.uid
         self['player_name'] = self.__soco.player_name
-        self["volume"] = self.__soco.volume
-        self["Queue"] = []
+        self['volume'] = self.__soco.volume
+        self['Queue'] = []
+        self['CanPlay'] = False
+        self['CanPause'] = False
+        self['CanGoNext'] = False
+        self['CanGoPrevious'] = False
 
         self.CurrentTrack = CurrentTrackViewModel()
 
@@ -85,15 +89,22 @@ class PlayerViewModel(ViewModelBase):
             while not subscription[0].events.empty():
                 event = subscription[0].events.get()
                 subscription[1](event)
+        if self['CurrentState'] == "PLAYING":
+            self.CurrentTrack.updatePosition()
                     
     def __avTransportEvent(self, event):
         self['CurrentState'] = event.variables['transport_state']
+        self.__updateAllowedCommands()
         baseUri = "http://%s:1400" % self.__soco.ip_address        
-        self.CurrentTrack.updateFromEvent(event.variables['current_track_meta_data'], baseUri)
+        trackChanged = self.CurrentTrack.updateFromEvent(event.variables['current_track_meta_data'], baseUri)
+        if trackChanged or self['CurrentState'] == "PLAYING":
+            track = self.__soco.get_current_track_info()
+            self.CurrentTrack.start(track['position'])
 
     def __contentDirectoryEvent(self, event):
         queue = self.__soco.get_queue()
         self['Queue'] = [QueueTrackViewModel(entry) for entry in queue]
+        self.__updateAllowedCommands()
 
     def __renderingControlEvent(self, event):
         self['volume'] = event.volume['Master']
@@ -104,6 +115,13 @@ class PlayerViewModel(ViewModelBase):
                 return index
         return -1
 
+    def __updateAllowedCommands(self):
+        queueLen = len(self['Queue'])
+        self['CanPlay'] = queueLen > 0 and self['CurrentState'] in ( "STOPPED", "PAUSED_PLAYBACK" )
+        self['CanPause'] = self['CurrentState'] == "PLAYING"
+        self['CanGoNext'] = queueLen
+        self['CanGoPrevious'] = queueLen
+         
     def play(self):
         self.__soco.play()
 
