@@ -43,6 +43,7 @@ class CurrentTrackView(tk.Frame):
 
         self.__images = AlbumImageProvider(settings)
 
+        self.empty_info = '-'
         self.__parent = parent
         self._labels = {}
         self.__image = None
@@ -127,6 +128,9 @@ class CurrentTrackView(tk.Frame):
         if self.__viewModel:
             self.__viewModel.removeListener(self.__onPropertyChanged)
             self.__viewModel = None
+        for label in self.__labels:
+            label.configure(text = self.empty_info)
+        self.clearImage()
 
     def __onPropertyChanged(self, propertyName, viewModel):
         if propertyName in self._labels:
@@ -165,8 +169,6 @@ class SonosList(tk.PanedWindow):
                   ipady = 5,
                   sticky = 'news')
 
-        self.__queueContent = []
-
         self._controlButtons = {}
         self._infoWidget = {}
         self._currentTrackView = None
@@ -177,8 +179,6 @@ class SonosList(tk.PanedWindow):
         self.__currentState = None
         self.__speakers = []
         self.__speakerId = tk.StringVar()
-
-        self.empty_info = '-'
 
         self._createWidgets()
         self._createMenu()
@@ -362,10 +362,11 @@ class SonosList(tk.PanedWindow):
             self.__currentSpeaker.removeListener(self.__onPropertyChanged)
             self._currentTrackView.detachViewModel()
         self.__currentSpeaker = speaker
-        speaker.addListener(self.__onPropertyChanged)
-        speaker.subscribe()
+        if speaker:
+            speaker.addListener(self.__onPropertyChanged)
+            speaker.subscribe()
+            self._currentTrackView.attachViewModel(speaker.CurrentTrack)
         self.__showSpeakerAndState(speaker)
-        self._currentTrackView.attachViewModel(speaker.CurrentTrack)
 
     def __showSpeakerAndState(self, speaker):
         title = "SoCo"
@@ -400,15 +401,6 @@ class SonosList(tk.PanedWindow):
         logging.debug('Changing volume to: %d', volume)
         speaker.setVolume(volume)
 
-    def __clear(self, typeName):
-        if typeName == 'queue':
-            logging.debug('Deleting old items')
-            self._queuebox.delete(0, tk.END)
-            del self.__queueContent[:]
-            self.__queueContent = []
-        elif typeName == 'album_art':
-            self._currentTrackView.clearImage()
-        
     def _selectSpeaker(self):
         speaker = None
         for s in self._speakers:
@@ -428,30 +420,15 @@ class SonosList(tk.PanedWindow):
         settings.setConfig('last_selected', speaker['uid'])
 
     def showSpeakerInfo(self, speaker):
-        newState = tk.ACTIVE if speaker is not None else tk.DISABLED
-        self._infoWidget['volume'].config(state = newState)
-        
         if speaker is None:
-            #self.__clearQueue()
-            for info in self._infoWidget.keys():
-                if info == 'volume':
-                    self._infoWidget[info].set(0)
-                    continue
-                elif info == 'album_art':
-                    self.__clear(info)
-                    continue
-                
-                self._infoWidget[info].config(text = self.empty_info)
-            return
-
-        #######################
-        # Load speaker info
-        #######################
-        self._infoWidget['volume'].set(speaker['volume'])
+            self._infoWidget['volume'].config(state = tk.DISABLED)
+            self._infoWidget['volume'].set(0)
+        else:
+            self._infoWidget['volume'].config(state = tk.ACTIVE)
 
     def _showQueue(self, queue):
         logging.debug('Deleting old items')
-        self.__clear('queue')
+        self._queuebox.delete(0, tk.END)
 
         logging.debug('Inserting items (%d) to listbox', len(queue))
         for item in queue:
