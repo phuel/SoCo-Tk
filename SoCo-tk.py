@@ -82,7 +82,6 @@ class CurrentTrackView(tk.Frame):
         self._labels['artist'].grid(row = infoIndex,
                                     column = 1,
                                     padx = 5,
-                                    pady = 5,
                                     sticky = 'we')
         infoIndex += 1
 
@@ -287,30 +286,20 @@ class SonosList(tk.PanedWindow):
         self.add(self._right)
 
         # Create queue list
-        scrollbar = tk.Scrollbar(self._right)
-        self._queuebox = tk.Listbox(self._right,
-                                    selectmode = tk.EXTENDED)
+        panel = tk.Frame(self._right)
+        scrollbar = tk.Scrollbar(panel)
+        self._queuebox = tk.Listbox(panel, selectmode = tk.EXTENDED)
 
         scrollbar.config(command = self._queuebox.yview)
         self._queuebox.config(yscrollcommand = scrollbar.set)
         self._queuebox.bind('<Double-Button-1>', self._playSelectedQueueItem)
         
-        scrollbar.grid(row = 0,
-                       column = 1,
-                       pady = 5,
-                       sticky = 'ns')
-        
-        self._queuebox.grid(row = 0,
-                            column = 0,
-                            padx = 5,
-                            pady = 5,
-                            sticky = 'news')
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self._queuebox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+        panel.pack(side=tk.TOP, fill=tk.BOTH, padx=5, pady=5, expand=1)        
 
         self._createButtons()
                           
-        self._right.rowconfigure(0, weight = 1)
-        self._right.columnconfigure(0, weight = 1)
-
         self._createInfoWidgets()
 
         self.after(500, self.__checkForEvents)
