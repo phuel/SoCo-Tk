@@ -1,39 +1,30 @@
-import Tkinter as tk
+from viewmodelbase import ViewModelBase 
 
-class CurrentTrackViewModel(object):
+class CurrentTrackViewModel(ViewModelBase):
     def __init__(self):
-        self.PropertyChanged = None
-        self.__data = {}
-    
-    def update(self, track):
-        self["uri"] = self.__getTrackProperty(track, 'uri')
-        self["title"] = self.__getTrackProperty(track, 'title')
-        self["album"] = self.__getTrackProperty(track, 'album')
-        self["artist"] = self.__getTrackProperty(track, 'artist')
-        self["album_art"] = self.__getTrackProperty(track, 'album_art')
-        self["duration"] = self.__getTrackProperty(track, 'duration')
+        ViewModelBase.__init__(self)
 
-    def updateFromEvent(self, entry):
+    def updateFromEvent(self, entry, baseUri):
         if not entry:
+            self.__clear()
             return
         self["uri"] = entry.resources[0].uri
         self["title"] = entry.title
         self["album"] = entry.album
         self["artist"] = entry.creator
-        self["album_art"] = entry.album_art_uri
+        albumArt = entry.album_art_uri
+        if not albumArt.startswith("http"):
+            albumArt = baseUri + albumArt
+        self["album_art"] = albumArt
         self["duration"] = entry.resources[0].duration
         
-    def __getitem__(self, key):
-        return self.__data[key]
-    
-    def __setitem__(self, key, value):
-        if not key in self.__data or self.__data[key] != value:
-            self.__data[key] = value
-            self.__onPropertyChanged(key)
-
-    def __onPropertyChanged(self, propertyName):
-        if self.PropertyChanged:
-            self.PropertyChanged(propertyName)
+    def __clear(self):
+        self["uri"] = ""
+        self["title"] = ""
+        self["album"] = ""
+        self["artist"] = ""
+        self["album_art"] = ""
+        self["duration"] = ""
 
     def __getTrackProperty(self, track, item):
         return track[item] if item in track else ""

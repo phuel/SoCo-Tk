@@ -9,7 +9,7 @@ import base64
 import platform, os
 
 from appsettings import AppSettings
-from playerviewmodel import Changes, PlayerViewModel 
+from playerviewmodel import PlayerViewModel 
 from albumimageprovider import AlbumImageProvider
 
 try:
@@ -121,19 +121,19 @@ class CurrentTrackView(tk.Frame):
         
     def attachViewModel(self, viewModel):
         self.__viewModel = viewModel
-        self.__viewModel.PropertyChanged = self.__onPropertyChanged
+        self.__viewModel.addListener(self.__onPropertyChanged)
     
     def detachViewModel(self):
         if self.__viewModel:
-            self.__viewModel.PropertyChanged = None
+            self.__viewModel.removeListener(self.__onPropertyChanged)
             self.__viewModel = None
 
-    def __onPropertyChanged(self, propertyName):
+    def __onPropertyChanged(self, propertyName, viewModel):
         if propertyName in self._labels:
-            value = self.__viewModel[propertyName]
+            value = viewModel[propertyName]
             self._labels[propertyName].configure(text=value)
         elif propertyName == 'album_art':
-            image = self.__images.getImage(self.__viewModel['uri'], self.__viewModel['album_art'])
+            image = self.__images.getImage(viewModel['uri'], viewModel['album_art'])
             self.__showAlbumArt(image)
     
     def __showAlbumArt(self, image):
@@ -214,7 +214,7 @@ class SonosList(tk.PanedWindow):
         speakers = []
         for ip in ips:
             speaker = PlayerViewModel(ip)
-            if not speaker.speaker_info:
+            if not speaker.isValidSpeaker():
                 logging.warning('Speaker %s does not have any info (probably a bridge), skipping...', ip)
                 continue
 
@@ -269,7 +269,7 @@ class SonosList(tk.PanedWindow):
         logging.debug('Inserting new items (%d)', len(speakers))
         for speaker in speakers:
             self._speakers.append(speaker)
-            self._speakermenu.add_radiobutton(label=speaker.display_name, value=speaker.uid, variable=self.__speakerId,
+            self._speakermenu.add_radiobutton(label=speaker.display_name, value=speaker['uid'], variable=self.__speakerId,
                                               command=self._selectSpeaker)
         
     def _createWidgets(self):
@@ -315,10 +315,16 @@ class SonosList(tk.PanedWindow):
     def __checkForEvents(self):
         speaker = self.__currentSpeaker
         if speaker:
-            changes = speaker.handleEvents()
-            if Changes.State in changes:
-                self.__showSpeakerAndState()
+            speaker.handleEvents()
         self.after(500, self.__checkForEvents)
+
+    def __onPropertyChanged(self, propertyName, viewModel):
+        if propertyName == 'CurrentState':
+            self.__showSpeakerAndState(viewModel)
+        elif propertyName == 'Queue':
+            self._showQueue(viewModel[propertyName])
+        elif propertyName == 'volume':
+            self._infoWidget['volume'].set(viewModel[propertyName])
 
     def _createInfoWidgets(self):
         ###################################
@@ -353,19 +359,20 @@ class SonosList(tk.PanedWindow):
     def __setSelectedSpeaker(self, speaker):
         if self.__currentSpeaker:
             self.__currentSpeaker.unscubscribe()
+            self.__currentSpeaker.removeListener(self.__onPropertyChanged)
             self._currentTrackView.detachViewModel()
         self.__currentSpeaker = speaker
-        self.__currentSpeaker.subscribe()
-        self.__showSpeakerAndState()
-        self._currentTrackView.attachViewModel(self.__currentSpeaker.CurrentTrack)
+        speaker.addListener(self.__onPropertyChanged)
+        speaker.subscribe()
+        self.__showSpeakerAndState(speaker)
+        self._currentTrackView.attachViewModel(speaker.CurrentTrack)
 
-    def __showSpeakerAndState(self):
+    def __showSpeakerAndState(self, speaker):
         title = "SoCo"
-        speaker = self.__getSelectedSpeaker()
         if speaker:
-            title += " - " + speaker.player_name
-            if speaker.CurrentState:
-                title += " - " + speaker.CurrentState
+            title += " - " + speaker['player_name']
+            if speaker['CurrentState']:
+                title += " - " + speaker['CurrentState']
         self.__parent.wm_title(title)
 
     def __getSelectedQueueItem(self):
@@ -378,8 +385,8 @@ class SonosList(tk.PanedWindow):
         index = int(selection[0])
 
         speaker = self.__getSelectedSpeaker()
-        assert len(speaker.Queue) > index
-        track = speaker.Queue[index]
+        assert len(speaker['Queue']) > index
+        track = speaker['Queue'][index]
         return track, index
         
     def _volumeChanged(self, evt):
@@ -391,7 +398,7 @@ class SonosList(tk.PanedWindow):
         volume = self._infoWidget['volume'].get()
 
         logging.debug('Changing volume to: %d', volume)
-        speaker.volume = volume
+        speaker.setVolume(volume)
 
     def __clear(self, typeName):
         if typeName == 'queue':
@@ -405,7 +412,7 @@ class SonosList(tk.PanedWindow):
     def _selectSpeaker(self):
         speaker = None
         for s in self._speakers:
-            if s.uid == self.__speakerId.get():
+            if s['uid'] == self.__speakerId.get():
                 speaker = s
         if speaker == self.__currentSpeaker:
             logging.info('Speaker already selected, skipping')
@@ -417,10 +424,10 @@ class SonosList(tk.PanedWindow):
                 
         logging.debug('Zoneplayer: "%s"', speaker)
 
-        logging.debug('Storing last_selected: %s' % speaker.speaker_info['uid'])
-        settings.setConfig('last_selected', speaker.speaker_info['uid'])
+        logging.debug('Storing last_selected: %s' % speaker['uid'])
+        settings.setConfig('last_selected', speaker['uid'])
 
-    def showSpeakerInfo(self, speaker, refresh_queue = True):
+    def showSpeakerInfo(self, speaker):
         newState = tk.ACTIVE if speaker is not None else tk.DISABLED
         self._infoWidget['volume'].config(state = newState)
         
@@ -440,46 +447,22 @@ class SonosList(tk.PanedWindow):
         #######################
         # Load speaker info
         #######################
-        playingTrack = None
-        try:
-            logging.info('Receive speaker info from: "%s"' % speaker)
-            track = speaker.refresh()
-            playingTrack = track["uri"]
+        self._infoWidget['volume'].set(speaker['volume'])
 
-            self._infoWidget['volume'].set(speaker.volume)
-        except:
-            errmsg = traceback.format_exc()
-            logging.error(errmsg)
-            tkMessageBox.showerror(title = 'Speaker info...',
-                                   message = 'Could not receive speaker information')
+    def _showQueue(self, queue):
+        logging.debug('Deleting old items')
+        self.__clear('queue')
 
-        #######################
-        # Load queue
-        #######################
-        try:
-            select = None
-            if refresh_queue:
-                logging.info('Gettting queue from speaker')
-                queue = speaker.refreshQueue()
+        logging.debug('Inserting items (%d) to listbox', len(queue))
+        for item in queue:
+            self._queuebox.insert(tk.END, item.display_name)
 
-                logging.debug('Deleting old items')
-                self.__clear('queue')
+        index = self.__getSelectedSpeaker().getCurrentTrackIndex()
+        if index >= 0:
+            self._queuebox.selection_clear(0, tk.END)
+            self._queuebox.selection_anchor(index)
+            self._queuebox.selection_set(index)
 
-                logging.debug('Inserting items (%d) to listbox', len(queue))
-                for item in queue:
-                    self._queuebox.insert(tk.END, item.display_name)
-
-                index = speaker.getCurrentTrackIndex()
-                if index >= 0:
-                    self._queuebox.selection_clear(0, tk.END)
-                    self._queuebox.selection_anchor(index)
-                    self._queuebox.selection_set(index)
-        except:
-            errmsg = traceback.format_exc()
-            logging.error(errmsg)
-            tkMessageBox.showerror(title = 'Queue...',
-                                   message = 'Could not receive speaker queue')
-                
     def _updateButtons(self):
         logging.debug('Updating control buttons')
         speaker = self.__getSelectedSpeaker()
@@ -628,7 +611,7 @@ class SonosList(tk.PanedWindow):
         logging.debug('Last selected speaker: %s', selected_speaker_uid)
 
         for speaker in speakers:
-            if speaker.uid == selected_speaker_uid:
+            if speaker['uid'] == selected_speaker_uid:
                 self.__setSelectedSpeaker(speaker)
                 self.showSpeakerInfo(speaker)
 
@@ -661,7 +644,7 @@ if __name__ == '__main__':
         root.minsize(800,400)
         main(root)
     except:
-        logging.debug(traceback.format_exc())
+        logging.error(traceback.format_exc())
     finally:
         root.quit()
         root.destroy()

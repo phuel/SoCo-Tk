@@ -1,4 +1,5 @@
 import logging
+import pprint
 
 try:
     import soco
@@ -15,16 +16,12 @@ except:
 
 from soco.events import event_listener
 
+from viewmodelbase import ViewModelBase
 from trackviewmodel import CurrentTrackViewModel, QueueTrackViewModel
 
-class Changes(object):
-    State = 1
-    Position = 2
-    Track = 3
-    Queue = 4
-
-class PlayerViewModel(object):
+class PlayerViewModel(ViewModelBase):
     def __init__(self, ip):
+        ViewModelBase.__init__(self)
         self.__soco = soco.SoCo(ip)
         
         try:
@@ -32,18 +29,22 @@ class PlayerViewModel(object):
         except:
             logging.warn('Could not get info for speaker ' + ip)
         
-        invalid_keys = [key for key, value in self.speaker_info.items() if value is None]
+        invalid_keys = [key for key, value in self.__soco.speaker_info.items() if value is None]
         for key in invalid_keys:
-            del self.speaker_info[key]
+            del self.__soco.speaker_info[key]
         
         self.__ipAddress = ip
-        self.__subscription = None
-        self.CurrentState = None
+        self.__subscriptions = []
+        self["CurrentState"] = None
+        self["uid"] = self.__soco.uid
+        self['player_name'] = self.__soco.player_name
+        self["volume"] = self.__soco.volume
+        self["Queue"] = []
+
         self.CurrentTrack = CurrentTrackViewModel()
-        self.Queue = []
 
     def __str__(self):
-        name = self.speaker_info['zone_name']
+        name = self.__soco.speaker_info['zone_name']
         if name is None:
             name = 'Unnamed'
         return name
@@ -60,59 +61,46 @@ class PlayerViewModel(object):
         event_listener.stop()
 
     @property
-    def speaker_info(self):
-        return self.__soco.speaker_info
-    
-    @property
-    def uid(self):
-        return self.__soco.uid
-    
-    @property
-    def player_name(self): 
-        return self.__soco.player_name
-
-    @property
     def display_name(self): 
         return "%s (%s)" % (self.__soco.player_name, self.__soco.ip_address)
 
-    @property
-    def volume(self): 
-        return self.__soco.volume
+    def isValidSpeaker(self):
+        return not self.__soco.speaker_info is None
+    
+    def setVolume(self, volume): 
+        self.__soco.volume = volume
 
     def subscribe(self):
-        self.__subscription = self.__soco.avTransport.subscribe()
+        self.__subscriptions.append((self.__soco.avTransport.subscribe(auto_renew=True), self.__avTransportEvent))
+        self.__subscriptions.append((self.__soco.contentDirectory.subscribe(auto_renew=True), self.__contentDirectoryEvent))
+        self.__subscriptions.append((self.__soco.renderingControl.subscribe(auto_renew=True), self.__renderingControlEvent))
     
     def unsubscribe(self):
-        if self.__subscription:
-            self.__subscription.unsubscribe()
-            self.__subscription = None
-    
-    def handleEvents(self):
-        changes = []
-        if self.__subscription:
-            while not self.__subscription.events.empty():
-                event = self.__subscription.events.get()
-                state = event.variables['transport_state']
-                if state != self.CurrentState:
-                    self.CurrentState = state
-                    changes.append(Changes.State)
-                if self.CurrentTrack.updateFromEvent(event.variables['current_track_meta_data']):
-                    changes.append(Changes.Track)
-        return changes
-                    
-    def refresh(self):
-        track = self.__soco.get_current_track_info()
-        self.CurrentTrack.update(track)
-        return self.CurrentTrack
+        for subscription in self.__subscriptions:
+            subscription[0].unsubscribe()
+        self.__subscriptions = []
 
-    def refreshQueue(self):
+    def handleEvents(self):
+        for subscription in self.__subscriptions:
+            while not subscription[0].events.empty():
+                event = subscription[0].events.get()
+                subscription[1](event)
+                    
+    def __avTransportEvent(self, event):
+        self['CurrentState'] = event.variables['transport_state']
+        baseUri = "http://%s:1400" % self.__soco.ip_address        
+        self.CurrentTrack.updateFromEvent(event.variables['current_track_meta_data'], baseUri)
+
+    def __contentDirectoryEvent(self, event):
         queue = self.__soco.get_queue()
-        self.Queue = [QueueTrackViewModel(entry) for entry in queue]
-        return self.Queue
+        self['Queue'] = [QueueTrackViewModel(entry) for entry in queue]
+
+    def __renderingControlEvent(self, event):
+        self['volume'] = event.volume['Master']
 
     def getCurrentTrackIndex(self):
-        for index, item in enumerate(self.Queue):
-            if item.Uri == self.CurrentTrack["uri"]:
+        for index, item in enumerate(self['Queue']):
+            if item.Uri == self.CurrentTrack['uri']:
                 return index
         return -1
 
