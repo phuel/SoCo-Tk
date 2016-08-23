@@ -126,7 +126,7 @@ class CurrentTrackView(tk.Frame):
                    column = 0,
                    sticky = 'w')
         
-        self._labels['position'] = Meter(self, fillcolor='darkgray', text="")
+        self._labels['position'] = Meter(self, fillcolor='darkgray', bg='lightgray', relief="sunken", bd=1, height=14, text="")
         self._labels['position'].grid(row = infoIndex,
                                       column = 1,
                                       padx = 5,
@@ -353,6 +353,10 @@ class SonosList(tk.PanedWindow):
         
         self._infoWidget['volume'].grid(row=0, column=1, padx = 5, pady = 5, sticky='we')
         self._infoWidget['volume'].bind('<ButtonRelease-1>', self._volumeChanged)
+
+        self._infoWidget['mute'] = tk.Button(panel, text="M", command=self.__mute)
+        self._infoWidget['mute'].grid(row=0, column=2)
+
         panel.pack(side=tk.BOTTOM, fill=tk.X)
 
         ###################################
@@ -375,10 +379,12 @@ class SonosList(tk.PanedWindow):
             speaker.addListener(self.__onPropertyChanged)
             speaker.subscribe()
             self._infoWidget['volume'].config(state = tk.ACTIVE)
+            self._infoWidget['mute'].config(state = tk.ACTIVE)
             self._currentTrackView.attachViewModel(speaker.CurrentTrack)
         else:
             self._infoWidget['volume'].config(state = tk.DISABLED)
             self._infoWidget['volume'].set(0)
+            self._infoWidget['mute'].config(state = tk.DISABLED)
         self.__showSpeakerAndState(speaker)
 
     def __showSpeakerAndState(self, speaker):
@@ -571,6 +577,12 @@ class SonosList(tk.PanedWindow):
         if not speaker:
             raise SystemError('No speaker selected, this should not happen')
         speaker.stop()
+
+    def __mute(self):
+        speaker = self.__getSelectedSpeaker()
+        if not speaker:
+            raise SystemError('No speaker selected, this should not happen')
+        speaker.mute()
 
     def _loadSettings(self):
         # Load window geometry

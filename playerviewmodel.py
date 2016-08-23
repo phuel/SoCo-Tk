@@ -149,3 +149,6 @@ class PlayerViewModel(ViewModelBase):
     
     def next(self):
         self.__soco.next()
+
+    def mute(self):
+        self.__soco.mute()
