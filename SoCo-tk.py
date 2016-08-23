@@ -12,6 +12,7 @@ from appsettings import AppSettings
 from playerviewmodel import PlayerViewModel 
 from albumimageprovider import AlbumImageProvider
 from progressmeter import Meter
+from images import Images
 
 try:
     from PIL import Image, ImageTk
@@ -357,7 +358,10 @@ class SonosList(tk.PanedWindow):
         self._infoWidget['volume'].bind('<ButtonRelease-1>', self._volumeChanged)
 
         self._infoWidget['muteVar'] = tk.IntVar()
-        self._infoWidget['mute'] = tk.Checkbutton(panel, text="M", command=self.__mute, indicatoron=False, variable=self._infoWidget['muteVar'])
+        self._infoWidget['mute'] = tk.Checkbutton(panel, image=Images.Get("appbar.sound.mute.png"),
+                                                  indicatoron=False,
+                                                  command=self.__mute,
+                                                  variable=self._infoWidget['muteVar'])
         self._infoWidget['mute'].grid(row=0, column=2, padx = 5)
 
         panel.pack(side=tk.BOTTOM, fill=tk.X)
@@ -470,40 +474,40 @@ class SonosList(tk.PanedWindow):
 
     def _configurePlayOrPauseButton(self, play):
         if play:
-            self._controlButtons['Play'].configure(text=">", command=self.__play)
+            self._controlButtons['Play'].configure(image = Images.Get("appbar.control.play.png"), command=self.__play)
         else:
-            self._controlButtons['Play'].configure(text="||", command=self.__pause)
+            self._controlButtons['Play'].configure(image = Images.Get("appbar.control.pause.png"), command=self.__pause)
         
     def _createButtons(self):
         logging.debug('Creating buttons')
-        buttonWidth = 2
+        buttonWidth = 32
         
         panel = tk.Frame(self._left)
         button_prev = tk.Button(panel,
                                 width = buttonWidth,
                                 command = self.__previous,
-                                text = '<<')
+                                image = Images.Get("appbar.chevron.left.png"))
         button_prev.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['Previous'] = button_prev
 
         button_play = tk.Button(panel,
                                  width = buttonWidth,
                                  command = self.__play,
-                                 text = '>')
+                                 image = Images.Get("appbar.control.play.png"))
         button_play.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['Play'] = button_play
 
         button_stop = tk.Button(panel,
                                  width = buttonWidth,
                                  command = self.__stop,
-                                 text = 'S')
+                                 image = Images.Get("appbar.control.stop.png"))
         button_stop.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['Stop'] = button_stop
 
         button_next = tk.Button(panel,
                                 width = buttonWidth,
                                 command = self.__next,
-                                text = '>>')
+                                image = Images.Get("appbar.chevron.right.png"))
         button_next.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['Next'] = button_next
         panel.pack(side=tk.BOTTOM)
