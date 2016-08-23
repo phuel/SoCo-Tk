@@ -100,6 +100,8 @@ class PlayerViewModel(ViewModelBase):
         if trackChanged or self['CurrentState'] == "PLAYING":
             track = self.__soco.get_current_track_info()
             self.CurrentTrack.start(track['position'])
+        elif self['CurrentState'] == "STOPPED":
+            self.CurrentTrack.start("0:0:0")
 
     def __contentDirectoryEvent(self, event):
         queue = self.__soco.get_queue()
@@ -119,9 +121,17 @@ class PlayerViewModel(ViewModelBase):
         queueLen = len(self['Queue'])
         self['CanPlay'] = queueLen > 0 and self['CurrentState'] in ( "STOPPED", "PAUSED_PLAYBACK" )
         self['CanPause'] = self['CurrentState'] == "PLAYING"
+        self['CanStop'] = self['CurrentState'] == "PLAYING"
+        self['CanPlayOrPause'] = self['CanPlay'] or self['CanPause']
         self['CanGoNext'] = queueLen
         self['CanGoPrevious'] = queueLen
          
+    def playOrPause(self):
+        if self['CanPlay']:
+            self.play()
+        elif self['CanPause']:
+            self.pause()
+
     def play(self):
         self.__soco.play()
 
@@ -131,6 +141,9 @@ class PlayerViewModel(ViewModelBase):
     def pause(self):
         self.__soco.pause()
     
+    def stop(self):
+        self.__soco.stop()
+
     def previous(self):
         self.__soco.previous()
     

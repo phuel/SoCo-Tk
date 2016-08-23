@@ -313,18 +313,26 @@ class SonosList(tk.PanedWindow):
     def __onPropertyChanged(self, propertyName, viewModel):
         if propertyName == 'CurrentState':
             self.__showSpeakerAndState(viewModel)
+            self._configurePlayOrPauseButton(viewModel[propertyName] != "PLAYING")
         elif propertyName == 'Queue':
             self._showQueue(viewModel[propertyName])
         elif propertyName == 'volume':
             self._infoWidget['volume'].set(viewModel[propertyName])
-        elif propertyName == 'CanPlay':
+        elif propertyName == 'CanPlayOrPause':
             self._updateButton('Play', viewModel[propertyName])
+        elif propertyName == 'CanPlay':
+            self._updateMenu('Play', viewModel[propertyName])
         elif propertyName == 'CanPause':
-            self._updateButton('Pause', viewModel[propertyName])
+            self._updateMenu('Pause', viewModel[propertyName])
+        elif propertyName == 'CanStop':
+            self._updateButton('Stop', viewModel[propertyName])
+            self._updateMenu('Stop', viewModel[propertyName])
         elif propertyName == 'CanGoNext':
             self._updateButton('Next', viewModel[propertyName])
+            self._updateMenu('Next', viewModel[propertyName])
         elif propertyName == 'CanGoPrevious':
             self._updateButton('Previous', viewModel[propertyName])
+            self._updateMenu('Previous', viewModel[propertyName])
 
     def _createInfoWidgets(self):
         ###################################
@@ -441,11 +449,21 @@ class SonosList(tk.PanedWindow):
         for (key,button) in self._controlButtons.items():
             button.config(state = newState)
             self._playbackmenu.entryconfigure(key, state=newState)
-        
+        self._playbackmenu.entryconfigure('Pause', state=newState)
+
     def _updateButton(self, key, enabled):
         newState = tk.ACTIVE if enabled else tk.DISABLED
         self._controlButtons[key].configure(state=newState)
+    
+    def _updateMenu(self, key, enabled):
+        newState = tk.ACTIVE if enabled else tk.DISABLED
         self._playbackmenu.entryconfigure(key, state=newState)
+
+    def _configurePlayOrPauseButton(self, play):
+        if play:
+            self._controlButtons['Play'].configure(text=">", command=self.__play)
+        else:
+            self._controlButtons['Play'].configure(text="||", command=self.__pause)
         
     def _createButtons(self):
         logging.debug('Creating buttons')
@@ -459,19 +477,19 @@ class SonosList(tk.PanedWindow):
         button_prev.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['Previous'] = button_prev
 
-        button_pause = tk.Button(panel,
-                                 width = buttonWidth,
-                                 command = self.__pause,
-                                 text = '||')
-        button_pause.pack(side=tk.LEFT, padx = 5, pady = 5)
-        self._controlButtons['Pause'] = button_pause
-
         button_play = tk.Button(panel,
                                  width = buttonWidth,
                                  command = self.__play,
                                  text = '>')
         button_play.pack(side=tk.LEFT, padx = 5, pady = 5)
         self._controlButtons['Play'] = button_play
+
+        button_stop = tk.Button(panel,
+                                 width = buttonWidth,
+                                 command = self.__stop,
+                                 text = 'S')
+        button_stop.pack(side=tk.LEFT, padx = 5, pady = 5)
+        self._controlButtons['Stop'] = button_stop
 
         button_next = tk.Button(panel,
                                 width = buttonWidth,
@@ -502,6 +520,7 @@ class SonosList(tk.PanedWindow):
 
         self._playbackmenu.add_command(label = "Play",     command = self.__play)
         self._playbackmenu.add_command(label = "Pause",    command = self.__pause)
+        self._playbackmenu.add_command(label = "Stop",     command = self.__stop)
         self._playbackmenu.add_command(label = "Previous", command = self.__previous)
         self._playbackmenu.add_command(label = "Next",     command = self.__next)
 
@@ -526,26 +545,32 @@ class SonosList(tk.PanedWindow):
     def __previous(self):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
-            raise SystemError('No speaker selected, this should not happend')
+            raise SystemError('No speaker selected, this should not happen')
         speaker.previous()
         
     def __next(self):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
-            raise SystemError('No speaker selected, this should not happend')
+            raise SystemError('No speaker selected, this should not happen')
         speaker.next()
 
     def __pause(self):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
-            raise SystemError('No speaker selected, this should not happend')
+            raise SystemError('No speaker selected, this should not happen')
         speaker.pause()
 
     def __play(self):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
-            raise SystemError('No speaker selected, this should not happend')
+            raise SystemError('No speaker selected, this should not happen')
         speaker.play()
+
+    def __stop(self):
+        speaker = self.__getSelectedSpeaker()
+        if not speaker:
+            raise SystemError('No speaker selected, this should not happen')
+        speaker.stop()
 
     def _loadSettings(self):
         # Load window geometry
