@@ -109,7 +109,10 @@ class PlayerViewModel(ViewModelBase):
         self.__updateAllowedCommands()
 
     def __renderingControlEvent(self, event):
-        self['volume'] = event.volume['Master']
+        if hasattr(event, 'volume'):
+            self['volume'] = event.volume['Master']
+        if hasattr(event, 'mute'):
+            self['mute'] = event.mute['Master']
 
     def getCurrentTrackIndex(self):
         for index, item in enumerate(self['Queue']):
@@ -151,4 +154,4 @@ class PlayerViewModel(ViewModelBase):
         self.__soco.next()
 
     def mute(self):
-        self.__soco.mute()
+        self.__soco.mute = not self.__soco.mute

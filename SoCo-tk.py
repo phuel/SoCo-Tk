@@ -318,6 +318,8 @@ class SonosList(tk.PanedWindow):
             self._showQueue(viewModel[propertyName])
         elif propertyName == 'volume':
             self._infoWidget['volume'].set(viewModel[propertyName])
+        elif propertyName == 'mute':
+            self._infoWidget['muteVar'].set(viewModel[propertyName])
         elif propertyName == 'CanPlayOrPause':
             self._updateButton('Play', viewModel[propertyName])
         elif propertyName == 'CanPlay':
@@ -343,7 +345,7 @@ class SonosList(tk.PanedWindow):
         panel.columnconfigure(1, weight=1)
 
         label = tk.Label(panel, text = 'Volume:')
-        label.grid(row = 0, column = 0, sticky = 'w')
+        label.grid(row = 0, column = 0, sticky = 'w', padx = 5)
 
         self._infoWidget['volume'] = tk.Scale(panel,
                                               from_ = 0,
@@ -351,11 +353,12 @@ class SonosList(tk.PanedWindow):
                                               tickinterval = 10,
                                               orient = tk.HORIZONTAL)
         
-        self._infoWidget['volume'].grid(row=0, column=1, padx = 5, pady = 5, sticky='we')
+        self._infoWidget['volume'].grid(row=0, column=1, pady = 5, sticky='we')
         self._infoWidget['volume'].bind('<ButtonRelease-1>', self._volumeChanged)
 
-        self._infoWidget['mute'] = tk.Button(panel, text="M", command=self.__mute)
-        self._infoWidget['mute'].grid(row=0, column=2)
+        self._infoWidget['muteVar'] = tk.IntVar()
+        self._infoWidget['mute'] = tk.Checkbutton(panel, text="M", command=self.__mute, indicatoron=False, variable=self._infoWidget['muteVar'])
+        self._infoWidget['mute'].grid(row=0, column=2, padx = 5)
 
         panel.pack(side=tk.BOTTOM, fill=tk.X)
 
