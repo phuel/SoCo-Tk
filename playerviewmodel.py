@@ -46,6 +46,7 @@ class PlayerViewModel(ViewModelBase):
 
         self.CurrentTrack = CurrentTrackViewModel()
         self.Queue = QueueViewModel()
+        self.Queue.SelectAndPlay = self.__selectAndPlay
 
     def __str__(self):
         name = self.__soco.speaker_info['zone_name']
@@ -97,7 +98,7 @@ class PlayerViewModel(ViewModelBase):
         self.__updateAllowedCommands()
         baseUri = "http://%s:1400" % self.__soco.ip_address        
         self.CurrentTrack.updateFromEvent(event.variables['current_track_meta_data'], baseUri)
-        trackChanged = self.Queue.setSelectedEntry(event.variables['current_track'])
+        trackChanged = self.Queue.setCurrentTrack(event.variables['current_track'])
         if trackChanged or self['CurrentState'] == "PLAYING":
             track = self.__soco.get_current_track_info()
             self.CurrentTrack.start(track['position'])
@@ -130,6 +131,9 @@ class PlayerViewModel(ViewModelBase):
         self['CanGoNext'] = queueLen
         self['CanGoPrevious'] = queueLen
          
+    def __selectAndPlay(self, index):
+        self.play_from_queue(index - 1) 
+    
     def playOrPause(self):
         if self['CanPlay']:
             self.play()
