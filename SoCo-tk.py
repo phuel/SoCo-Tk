@@ -10,17 +10,10 @@ import platform, os
 
 from appsettings import AppSettings
 from playerviewmodel import PlayerViewModel 
-from albumimageprovider import AlbumImageProvider
-from progressmeter import Meter
+from currenttrackview import CurrentTrackView
+from queueview import QueueView
 from images import Images
 
-try:
-    from PIL import Image, ImageTk
-except:
-    logging.error('Could not import PIL')
-    logging.error(traceback.format_exc())
-    ImageTk = None
-    Image = None
 
 USER_DATA = None
 
@@ -36,156 +29,6 @@ elif platform.system() == 'Linux':
 
 settings = AppSettings(USER_DATA)
 
-class CurrentTrackView(tk.Frame):
-
-    def __init__(self, parent):
-        tk.Frame.__init__(self, parent)
-
-        self.columnconfigure(1, weight = 1)
-
-        self.__images = AlbumImageProvider(settings)
-
-        self.empty_info = '-'
-        self.__parent = parent
-        self._labels = {}
-        self.__image = None
-        infoIndex = 0
-
-        ###################################
-        # Title
-        ###################################
-        label = tk.Label(self, text = 'Title:')
-        label.grid(row = infoIndex,
-                   column = 0,
-                   sticky = 'w')
-        
-        self._labels['title'] = tk.Label(self,
-                                         anchor = 'w')
-        
-        self._labels['title'].grid(row = infoIndex,
-                                   column = 1,
-                                   padx = 5,
-                                   pady = 5,
-                                   sticky = 'we')
-        infoIndex += 1
-
-        ###################################
-        # Artist
-        ###################################
-        label = tk.Label(self, text = 'Artist:')
-        label.grid(row = infoIndex,
-                   column = 0,
-                   sticky = 'w')
-        
-        self._labels['artist'] = tk.Label(self,
-                                          anchor = 'w')
-        
-        self._labels['artist'].grid(row = infoIndex,
-                                    column = 1,
-                                    padx = 5,
-                                    sticky = 'we')
-        infoIndex += 1
-
-        ###################################
-        # Album
-        ###################################
-        label = tk.Label(self, text = 'Album:')
-        label.grid(row = infoIndex,
-                   column = 0,
-                   sticky = 'w')
-        
-        self._labels['album'] = tk.Label(self,
-                                         anchor = 'w')
-        
-        self._labels['album'].grid(row = infoIndex,
-                                   column = 1,
-                                   padx = 5,
-                                   pady = 5,
-                                   sticky = 'we')
-        infoIndex += 1
-
-        ###################################
-        # Album art
-        ###################################
-        self._album_art = tk.Label(self,
-                                   image = tk.PhotoImage(),
-                                   width = 150,
-                                   height = 150)
-        
-        self._album_art.grid(row = infoIndex,
-                             column = 0,
-                             columnspan = 2,
-                             padx = 5,
-                             pady = 5)
-        infoIndex += 1
-
-        ###################################
-        # Position
-        ###################################
-        label = tk.Label(self, text = 'Position:')
-        label.grid(row = infoIndex,
-                   column = 0,
-                   sticky = 'w')
-        
-        self._labels['position'] = Meter(self, fillcolor='darkgray', bg='lightgray', relief="sunken", bd=1, height=14, text="")
-        self._labels['position'].grid(row = infoIndex,
-                                      column = 1,
-                                      padx = 5,
-                                      pady = 5,
-                                      sticky = 'we')
- 
-    def clearImage(self):
-        self.__showAlbumArt(None)
-        
-    def attachViewModel(self, viewModel):
-        self.__viewModel = viewModel
-        self.__viewModel.addListener(self.__onPropertyChanged)
-    
-    def detachViewModel(self):
-        if self.__viewModel:
-            self.__viewModel.removeListener(self.__onPropertyChanged)
-            self.__viewModel = None
-        for label in self.__labels:
-            label.configure(text = self.empty_info)
-        self.clearImage()
-
-    def __onPropertyChanged(self, propertyName, viewModel):
-        if propertyName == 'position':
-            if viewModel['duration'] and viewModel['position']:
-                showHours = viewModel['duration'].seconds > 3600
-                position = self.__formatDuration(viewModel['position'], showHours) + " / " + self.__formatDuration(viewModel['duration'], showHours)
-                self._labels[propertyName].set(value=viewModel['position'].total_seconds() / viewModel['duration'].total_seconds(), text=position)
-            else:
-                self._labels[propertyName].set(value=0, text="")
-        elif propertyName in self._labels:
-            value = viewModel[propertyName]
-            self._labels[propertyName].configure(text=value)
-        elif propertyName == 'album_art':
-            image = self.__images.getImage(viewModel['uri'], viewModel['album_art'])
-            self.__showAlbumArt(image)
-    
-    def __formatDuration(self, time, showHours):
-        hours, remainder = divmod(time.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60) 
-        if showHours:
-            return "%d:%02d:%02d" % (hours, minutes, seconds)
-        return "%d:%02d" % (minutes, seconds)
-
-    def __showAlbumArt(self, image):
-        if image is None:
-            self._album_art.config(image = None)
-            self.__image = None
-            return
-
-        widgetConfig = self._album_art.config()
-        thumbSize = (int(widgetConfig['width'][4]),
-                     int(widgetConfig['height'][4]))
-
-        logging.debug('Resizing album art to: %s', thumbSize)
-        image.thumbnail(thumbSize, Image.ANTIALIAS)
-        self.__image = ImageTk.PhotoImage(image = image)
-        self._album_art.configure(image = self.__image)
-        
 class SonosList(tk.PanedWindow):
 
     def __init__(self, parent):
@@ -208,7 +51,7 @@ class SonosList(tk.PanedWindow):
         self._controlButtons = {}
         self._infoWidget = {}
         self._currentTrackView = None
-
+        self._queueView = None
         self.__lastSelected = None
         self.__currentSpeaker = None
         self.__subscription = None
@@ -287,20 +130,9 @@ class SonosList(tk.PanedWindow):
         self.add(self._right)
 
         # Create queue list
-        panel = tk.Frame(self._right)
-        scrollbar = tk.Scrollbar(panel)
-        self._queuebox = tk.Listbox(panel, selectmode = tk.EXTENDED)
-
-        scrollbar.config(command = self._queuebox.yview)
-        self._queuebox.config(yscrollcommand = scrollbar.set)
-        self._queuebox.bind('<Double-Button-1>', self._playSelectedQueueItem)
+        self._queueView = QueueView(self._right)
         
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self._queuebox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        panel.pack(side=tk.TOP, fill=tk.BOTH, padx=5, pady=5, expand=1)        
-
         self._createButtons()
-                          
         self._createInfoWidgets()
 
         self.after(500, self.__checkForEvents)
@@ -315,8 +147,6 @@ class SonosList(tk.PanedWindow):
         if propertyName == 'CurrentState':
             self.__showSpeakerAndState(viewModel)
             self._configurePlayOrPauseButton(viewModel[propertyName] != "PLAYING")
-        elif propertyName == 'Queue':
-            self._showQueue(viewModel[propertyName])
         elif propertyName == 'volume':
             self._infoWidget['volume'].set(viewModel[propertyName])
         elif propertyName == 'mute':
@@ -369,7 +199,7 @@ class SonosList(tk.PanedWindow):
         ###################################
         # Current track
         ###################################
-        self._currentTrackView = CurrentTrackView(self._left)
+        self._currentTrackView = CurrentTrackView(self._left, settings)
         self._currentTrackView.pack(side=tk.TOP, fill=tk.BOTH)
 
     def __getSelectedSpeaker(self):
@@ -380,6 +210,7 @@ class SonosList(tk.PanedWindow):
             self.__currentSpeaker.unscubscribe()
             self.__currentSpeaker.removeListener(self.__onPropertyChanged)
             self._currentTrackView.detachViewModel()
+            self._queueView.detachViewModel()
         self._disableButtons()
         self.__currentSpeaker = speaker
         if speaker:
@@ -388,6 +219,7 @@ class SonosList(tk.PanedWindow):
             self._infoWidget['volume'].config(state = tk.ACTIVE)
             self._infoWidget['mute'].config(state = tk.ACTIVE)
             self._currentTrackView.attachViewModel(speaker.CurrentTrack)
+            self._queueView.attachViewModel(speaker.Queue, speaker)
         else:
             self._infoWidget['volume'].config(state = tk.DISABLED)
             self._infoWidget['volume'].set(0)
@@ -402,20 +234,6 @@ class SonosList(tk.PanedWindow):
                 title += " - " + speaker['CurrentState']
         self.__parent.wm_title(title)
 
-    def __getSelectedQueueItem(self):
-        widget = self._queuebox
-
-        selection = widget.curselection()
-        if not selection:
-            return None, None
-
-        index = int(selection[0])
-
-        speaker = self.__getSelectedSpeaker()
-        assert len(speaker['Queue']) > index
-        track = speaker['Queue'][index]
-        return track, index
-        
     def _volumeChanged(self, evt):
         speaker = self.__getSelectedSpeaker()
         if not speaker:
@@ -443,20 +261,6 @@ class SonosList(tk.PanedWindow):
         logging.debug('Storing last_selected: %s' % speaker['uid'])
         settings.setConfig('last_selected', speaker['uid'])
 
-    def _showQueue(self, queue):
-        logging.debug('Deleting old items')
-        self._queuebox.delete(0, tk.END)
-
-        logging.debug('Inserting items (%d) to listbox', len(queue))
-        for item in queue:
-            self._queuebox.insert(tk.END, item.display_name)
-
-        index = self.__getSelectedSpeaker().getCurrentTrackIndex()
-        if index >= 0:
-            self._queuebox.selection_clear(0, tk.END)
-            self._queuebox.selection_anchor(index)
-            self._queuebox.selection_set(index)
-
     def _disableButtons(self):
         newState = tk.DISABLED
         for (key,button) in self._controlButtons.items():
@@ -480,37 +284,32 @@ class SonosList(tk.PanedWindow):
         
     def _createButtons(self):
         logging.debug('Creating buttons')
-        buttonWidth = 32
         
         panel = tk.Frame(self._left)
         button_prev = tk.Button(panel,
-                                width = buttonWidth,
                                 command = self.__previous,
                                 image = Images.Get("appbar.chevron.left.png"))
-        button_prev.pack(side=tk.LEFT, padx = 5, pady = 5)
+        button_prev.pack(side=tk.LEFT, fill=tk.X, expand=1, padx=2, pady=5)
         self._controlButtons['Previous'] = button_prev
 
         button_play = tk.Button(panel,
-                                 width = buttonWidth,
                                  command = self.__play,
                                  image = Images.Get("appbar.control.play.png"))
-        button_play.pack(side=tk.LEFT, padx = 5, pady = 5)
+        button_play.pack(side=tk.LEFT, fill=tk.X, expand=1, padx=2, pady=5)
         self._controlButtons['Play'] = button_play
 
         button_stop = tk.Button(panel,
-                                 width = buttonWidth,
                                  command = self.__stop,
                                  image = Images.Get("appbar.control.stop.png"))
-        button_stop.pack(side=tk.LEFT, padx = 5, pady = 5)
+        button_stop.pack(side=tk.LEFT, fill=tk.X, expand=1, padx=2, pady=5)
         self._controlButtons['Stop'] = button_stop
 
         button_next = tk.Button(panel,
-                                width = buttonWidth,
                                 command = self.__next,
                                 image = Images.Get("appbar.chevron.right.png"))
-        button_next.pack(side=tk.LEFT, padx = 5, pady = 5)
+        button_next.pack(side=tk.LEFT, fill=tk.X, expand=1, padx=2, pady=5)
         self._controlButtons['Next'] = button_next
-        panel.pack(side=tk.BOTTOM)
+        panel.pack(side=tk.BOTTOM, fill=tk.X)
 
     def _createMenu(self):
         logging.debug('Creating menu')
@@ -536,24 +335,6 @@ class SonosList(tk.PanedWindow):
         self._playbackmenu.add_command(label = "Stop",     command = self.__stop)
         self._playbackmenu.add_command(label = "Previous", command = self.__previous)
         self._playbackmenu.add_command(label = "Next",     command = self.__next)
-
-    def _playSelectedQueueItem(self, evt):
-        try:
-            track, track_index = self.__getSelectedQueueItem()
-            speaker = self.__getSelectedSpeaker()
-
-            if speaker is None or\
-               track_index is None:
-                logging.warning('Could not get track or speaker (%s, %s)', track_index, speaker)
-                return
-            
-            speaker.play_from_queue(track_index)
-        except:
-            logging.error('Could not play queue item')
-            logging.error(traceback.format_exc())
-            tkMessageBox.showerror(title = 'Queue...',
-                                   message = 'Error playing queue item, please check error log for description')
-        
 
     def __previous(self):
         speaker = self.__getSelectedSpeaker()

@@ -1,5 +1,4 @@
 import logging
-import pprint
 
 try:
     import soco
@@ -17,7 +16,8 @@ except:
 from soco.events import event_listener
 
 from viewmodelbase import ViewModelBase
-from trackviewmodel import CurrentTrackViewModel, QueueTrackViewModel
+from currenttrackviewmodel import CurrentTrackViewModel
+from queueviewmodel import QueueViewModel
 
 class PlayerViewModel(ViewModelBase):
     def __init__(self, ip):
@@ -39,13 +39,13 @@ class PlayerViewModel(ViewModelBase):
         self['uid'] = self.__soco.uid
         self['player_name'] = self.__soco.player_name
         self['volume'] = self.__soco.volume
-        self['Queue'] = []
         self['CanPlay'] = False
         self['CanPause'] = False
         self['CanGoNext'] = False
         self['CanGoPrevious'] = False
 
         self.CurrentTrack = CurrentTrackViewModel()
+        self.Queue = QueueViewModel()
 
     def __str__(self):
         name = self.__soco.speaker_info['zone_name']
@@ -96,7 +96,8 @@ class PlayerViewModel(ViewModelBase):
         self['CurrentState'] = event.variables['transport_state']
         self.__updateAllowedCommands()
         baseUri = "http://%s:1400" % self.__soco.ip_address        
-        trackChanged = self.CurrentTrack.updateFromEvent(event.variables['current_track_meta_data'], baseUri)
+        self.CurrentTrack.updateFromEvent(event.variables['current_track_meta_data'], baseUri)
+        trackChanged = self.Queue.setSelectedEntry(event.variables['current_track'])
         if trackChanged or self['CurrentState'] == "PLAYING":
             track = self.__soco.get_current_track_info()
             self.CurrentTrack.start(track['position'])
@@ -105,7 +106,7 @@ class PlayerViewModel(ViewModelBase):
 
     def __contentDirectoryEvent(self, event):
         queue = self.__soco.get_queue()
-        self['Queue'] = [QueueTrackViewModel(entry) for entry in queue]
+        self.Queue.setEntries(queue)
         self.__updateAllowedCommands()
 
     def __renderingControlEvent(self, event):
@@ -115,13 +116,13 @@ class PlayerViewModel(ViewModelBase):
             self['mute'] = event.mute['Master']
 
     def getCurrentTrackIndex(self):
-        for index, item in enumerate(self['Queue']):
-            if item.Uri == self.CurrentTrack['uri']:
+        for index, item in enumerate(self.Queue['entries']):
+            if item['uri'] == self.CurrentTrack['uri']:
                 return index
         return -1
 
     def __updateAllowedCommands(self):
-        queueLen = len(self['Queue'])
+        queueLen = self.Queue.length
         self['CanPlay'] = queueLen > 0 and self['CurrentState'] in ( "STOPPED", "PAUSED_PLAYBACK" )
         self['CanPause'] = self['CurrentState'] == "PLAYING"
         self['CanStop'] = self['CurrentState'] == "PLAYING"

@@ -3,11 +3,11 @@ import datetime
 from viewmodelbase import ViewModelBase 
 
 class CurrentTrackViewModel(ViewModelBase):
+    """ Viemodel for the current track. """
     def __init__(self):
         ViewModelBase.__init__(self)
         self.__startPos = datetime.timedelta()
         self.__startTime = None
-        self.__lastUri = None
         self.__clear()
 
     def updateFromEvent(self, entry, baseUri):
@@ -15,6 +15,7 @@ class CurrentTrackViewModel(ViewModelBase):
             self.__clear()
             return
         self['uri'] = entry.resources[0].uri
+        self['item_id'] = entry.item_id
         self['title'] = entry.title
         self['album'] = entry.album
         self['artist'] = entry.creator
@@ -23,9 +24,6 @@ class CurrentTrackViewModel(ViewModelBase):
             albumArt = baseUri + albumArt
         self['album_art'] = albumArt
         self['duration'] = self.__parseTime(entry.resources[0].duration)
-        trackChanged = self.__lastUri != self['uri']
-        self.__lastUri = self['uri']
-        return trackChanged
 
     def start(self, position):
         self.__startPos = self.__parseTime(position)
@@ -55,20 +53,3 @@ class CurrentTrackViewModel(ViewModelBase):
     def __getTrackProperty(self, track, item):
         return track[item] if item in track else ""
     
-class QueueTrackViewModel(object):
-    labelQueue = '%(artist)s - %(title)s'
-    
-    def __init__(self, entry):
-        self.Uri = entry.resources[0].uri
-        self.Title = entry.title
-        self.Album = entry.album
-        self.Artist = entry.creator
-        self.AlbumArt = entry.album_art_uri
-        self.Duration = entry.resources[0].duration
-
-    @property
-    def display_name(self):
-        text = self.labelQueue % { 'artist' : self.Artist, 'title' : self.Title }
-        if self.Duration:
-            text += " (%s)" % self.Duration
-        return text
