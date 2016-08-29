@@ -13,7 +13,7 @@ from playerviewmodel import PlayerViewModel
 from currenttrackview import CurrentTrackView
 from queueview import QueueView
 from images import Images
-
+import keynames as kn
 
 USER_DATA = None
 
@@ -115,7 +115,7 @@ class SonosList(tk.PanedWindow):
         logging.debug('Inserting new items (%d)', len(speakers))
         for speaker in speakers:
             self._speakers.append(speaker)
-            self._speakermenu.add_radiobutton(label=speaker.display_name, value=speaker['uid'], variable=self.__speakerId,
+            self._speakermenu.add_radiobutton(label=speaker.display_name, value=speaker[kn.uid], variable=self.__speakerId,
                                               command=self._selectSpeaker)
         
     def _createWidgets(self):
@@ -144,26 +144,26 @@ class SonosList(tk.PanedWindow):
         self.after(500, self.__checkForEvents)
 
     def __onPropertyChanged(self, propertyName, viewModel):
-        if propertyName == 'CurrentState':
+        if propertyName == kn.current_state:
             self.__showSpeakerAndState(viewModel)
             self._configurePlayOrPauseButton(viewModel[propertyName] != "PLAYING")
-        elif propertyName == 'volume':
-            self._infoWidget['volume'].set(viewModel[propertyName])
-        elif propertyName == 'mute':
+        elif propertyName == kn.volume:
+            self._infoWidget[kn.volume].set(viewModel[propertyName])
+        elif propertyName == kn.mute:
             self._infoWidget['muteVar'].set(viewModel[propertyName])
-        elif propertyName == 'CanPlayOrPause':
+        elif propertyName == kn.can_play_or_pause:
             self._updateButton('Play', viewModel[propertyName])
-        elif propertyName == 'CanPlay':
+        elif propertyName == kn.can_play:
             self._updateMenu('Play', viewModel[propertyName])
-        elif propertyName == 'CanPause':
+        elif propertyName == kn.can_pause:
             self._updateMenu('Pause', viewModel[propertyName])
-        elif propertyName == 'CanStop':
+        elif propertyName == kn.can_stop:
             self._updateButton('Stop', viewModel[propertyName])
             self._updateMenu('Stop', viewModel[propertyName])
-        elif propertyName == 'CanGoNext':
+        elif propertyName == kn.can_go_next:
             self._updateButton('Next', viewModel[propertyName])
             self._updateMenu('Next', viewModel[propertyName])
-        elif propertyName == 'CanGoPrevious':
+        elif propertyName == kn.can_go_previous:
             self._updateButton('Previous', viewModel[propertyName])
             self._updateMenu('Previous', viewModel[propertyName])
 
@@ -178,21 +178,21 @@ class SonosList(tk.PanedWindow):
         label = tk.Label(panel, text = 'Volume:')
         label.grid(row = 0, column = 0, sticky = 'w', padx = 5)
 
-        self._infoWidget['volume'] = tk.Scale(panel,
-                                              from_ = 0,
-                                              to = 100,
-                                              tickinterval = 10,
-                                              orient = tk.HORIZONTAL)
+        self._infoWidget[kn.volume] = tk.Scale(panel,
+                                               from_ = 0,
+                                               to = 100,
+                                               tickinterval = 10,
+                                               orient = tk.HORIZONTAL)
         
-        self._infoWidget['volume'].grid(row=0, column=1, pady = 5, sticky='we')
-        self._infoWidget['volume'].bind('<ButtonRelease-1>', self._volumeChanged)
+        self._infoWidget[kn.volume].grid(row=0, column=1, pady = 5, sticky='we')
+        self._infoWidget[kn.volume].bind('<ButtonRelease-1>', self._volumeChanged)
 
         self._infoWidget['muteVar'] = tk.IntVar()
-        self._infoWidget['mute'] = tk.Checkbutton(panel, image=Images.Get("appbar.sound.mute.png"),
+        self._infoWidget[kn.mute] = tk.Checkbutton(panel, image=Images.Get("appbar.sound.mute.png"),
                                                   indicatoron=False,
                                                   command=self.__mute,
                                                   variable=self._infoWidget['muteVar'])
-        self._infoWidget['mute'].grid(row=0, column=2, padx = 5)
+        self._infoWidget[kn.mute].grid(row=0, column=2, padx = 5)
 
         panel.pack(side=tk.BOTTOM, fill=tk.X)
 
@@ -216,22 +216,22 @@ class SonosList(tk.PanedWindow):
         if speaker:
             speaker.addListener(self.__onPropertyChanged)
             speaker.subscribe()
-            self._infoWidget['volume'].config(state = tk.ACTIVE)
-            self._infoWidget['mute'].config(state = tk.ACTIVE)
+            self._infoWidget[kn.volume].config(state = tk.ACTIVE)
+            self._infoWidget[kn.mute].config(state = tk.ACTIVE)
             self._currentTrackView.attachViewModel(speaker.CurrentTrack)
             self._queueView.attachViewModel(speaker.Queue, speaker)
         else:
-            self._infoWidget['volume'].config(state = tk.DISABLED)
-            self._infoWidget['volume'].set(0)
-            self._infoWidget['mute'].config(state = tk.DISABLED)
+            self._infoWidget[kn.volume].config(state = tk.DISABLED)
+            self._infoWidget[kn.volume].set(0)
+            self._infoWidget[kn.mute].config(state = tk.DISABLED)
         self.__showSpeakerAndState(speaker)
 
     def __showSpeakerAndState(self, speaker):
         title = "SoCo"
         if speaker:
-            title += " - " + speaker['player_name']
-            if speaker['CurrentState']:
-                title += " - " + speaker['CurrentState']
+            title += " - " + speaker[kn.player_name]
+            if speaker[kn.current_state]:
+                title += " - " + speaker[kn.current_state]
         self.__parent.wm_title(title)
 
     def _volumeChanged(self, evt):
@@ -240,7 +240,7 @@ class SonosList(tk.PanedWindow):
             logging.warning('No speaker selected')
             return
         
-        volume = self._infoWidget['volume'].get()
+        volume = self._infoWidget[kn.volume].get()
 
         logging.debug('Changing volume to: %d', volume)
         speaker.setVolume(volume)
@@ -248,7 +248,7 @@ class SonosList(tk.PanedWindow):
     def _selectSpeaker(self):
         speaker = None
         for s in self._speakers:
-            if s['uid'] == self.__speakerId.get():
+            if s[kn.uid] == self.__speakerId.get():
                 speaker = s
         if speaker == self.__currentSpeaker:
             logging.info('Speaker already selected, skipping')
@@ -258,8 +258,8 @@ class SonosList(tk.PanedWindow):
                 
         logging.debug('Zoneplayer: "%s"', speaker)
 
-        logging.debug('Storing last_selected: %s' % speaker['uid'])
-        settings.setConfig('last_selected', speaker['uid'])
+        logging.debug('Storing last_selected: %s' % speaker[kn.uid])
+        settings.setConfig('last_selected', speaker[kn.uid])
 
     def _disableButtons(self):
         newState = tk.DISABLED
@@ -406,7 +406,7 @@ class SonosList(tk.PanedWindow):
         logging.debug('Last selected speaker: %s', selected_speaker_uid)
 
         for speaker in speakers:
-            if speaker['uid'] == selected_speaker_uid:
+            if speaker[kn.uid] == selected_speaker_uid:
                 self.__setSelectedSpeaker(speaker)
 
     def _cleanExit(self):

@@ -3,6 +3,7 @@ import Tkinter as tk
 
 from albumimageprovider import AlbumImageProvider
 from progressmeter import Meter
+import keynames as kn
 
 try:
     from PIL import Image, ImageTk
@@ -13,8 +14,10 @@ except:
     Image = None
 
 class CurrentTrackView(tk.Frame):
-
+    """ The view displaying the current track. """
+    
     def __init__(self, parent, settings):
+        """ Constructor """
         tk.Frame.__init__(self, parent)
 
         self.columnconfigure(1, weight = 1)
@@ -27,57 +30,41 @@ class CurrentTrackView(tk.Frame):
         self.__image = None
         infoIndex = 0
 
+        labelGridSettings = {
+            'column' : 1,
+            'padx' : 5,
+            'pady' : 5,
+            'sticky' : 'we'
+        }
+
         ###################################
         # Title
         ###################################
         label = tk.Label(self, text = 'Title:')
-        label.grid(row = infoIndex,
-                   column = 0,
-                   sticky = 'w')
+        label.grid(row = infoIndex, column = 0, sticky = 'w')
         
-        self._labels['title'] = tk.Label(self,
-                                         anchor = 'w')
-        
-        self._labels['title'].grid(row = infoIndex,
-                                   column = 1,
-                                   padx = 5,
-                                   pady = 5,
-                                   sticky = 'we')
+        self._labels[kn.title] = tk.Label(self, anchor = 'w')
+        self._labels[kn.title].grid(labelGridSettings, row = infoIndex)
         infoIndex += 1
 
         ###################################
         # Artist
         ###################################
         label = tk.Label(self, text = 'Artist:')
-        label.grid(row = infoIndex,
-                   column = 0,
-                   sticky = 'w')
+        label.grid(row = infoIndex, column = 0, sticky = 'w')
         
-        self._labels['artist'] = tk.Label(self,
-                                          anchor = 'w')
-        
-        self._labels['artist'].grid(row = infoIndex,
-                                    column = 1,
-                                    padx = 5,
-                                    sticky = 'we')
+        self._labels[kn.artist] = tk.Label(self, anchor = 'w')
+        self._labels[kn.artist].grid(labelGridSettings, row = infoIndex)
         infoIndex += 1
 
         ###################################
         # Album
         ###################################
         label = tk.Label(self, text = 'Album:')
-        label.grid(row = infoIndex,
-                   column = 0,
-                   sticky = 'w')
+        label.grid(row = infoIndex, column = 0, sticky = 'w')
         
-        self._labels['album'] = tk.Label(self,
-                                         anchor = 'w')
-        
-        self._labels['album'].grid(row = infoIndex,
-                                   column = 1,
-                                   padx = 5,
-                                   pady = 5,
-                                   sticky = 'we')
+        self._labels[kn.album] = tk.Label(self, anchor = 'w')
+        self._labels[kn.album].grid(labelGridSettings, row = infoIndex)
         infoIndex += 1
 
         ###################################
@@ -103,21 +90,20 @@ class CurrentTrackView(tk.Frame):
                    column = 0,
                    sticky = 'w')
         
-        self._labels['position'] = Meter(self, fillcolor='darkgray', bg='lightgray', relief="sunken", bd=1, height=14, text="")
-        self._labels['position'].grid(row = infoIndex,
-                                      column = 1,
-                                      padx = 5,
-                                      pady = 5,
-                                      sticky = 'we')
+        self._labels[kn.position] = Meter(self, fillcolor='darkgray', bg='lightgray', relief="sunken", bd=1, height=14, text="")
+        self._labels[kn.position].grid(labelGridSettings, row = infoIndex)
  
     def clearImage(self):
+        """ Clear the displayed image. """
         self.__showAlbumArt(None)
         
     def attachViewModel(self, viewModel):
+        """ Attach the event listener to the view model. """
         self.__viewModel = viewModel
         self.__viewModel.addListener(self.__onPropertyChanged)
     
     def detachViewModel(self):
+        """ REmove the event listener from the view model. """
         if self.__viewModel:
             self.__viewModel.removeListener(self.__onPropertyChanged)
             self.__viewModel = None
@@ -126,21 +112,26 @@ class CurrentTrackView(tk.Frame):
         self.clearImage()
 
     def __onPropertyChanged(self, propertyName, viewModel):
-        if propertyName == 'position':
-            if viewModel['duration'] and viewModel['position']:
-                showHours = viewModel['duration'].seconds > 3600
-                position = self.__formatDuration(viewModel['position'], showHours) + " / " + self.__formatDuration(viewModel['duration'], showHours)
-                self._labels[propertyName].set(value=viewModel['position'].total_seconds() / viewModel['duration'].total_seconds(), text=position)
+        """ Update the view after changes in the view model. """
+        if propertyName == kn.position:
+            if viewModel[kn.duration] and viewModel[kn.position]:
+                showHours = viewModel[kn.duration].seconds > 3600
+                position = "%s / %s" % (self.__formatDuration(viewModel[kn.position], showHours),
+                                        self.__formatDuration(viewModel[kn.duration], showHours))
+                progress = viewModel[kn.position].total_seconds() / viewModel[kn.duration].total_seconds()
+                self._labels[propertyName].set(value=progress, text=position)
             else:
                 self._labels[propertyName].set(value=0, text="")
         elif propertyName in self._labels:
             value = viewModel[propertyName]
             self._labels[propertyName].configure(text=value)
-        elif propertyName == 'album_art':
-            image = self.__images.getImage(viewModel['uri'], viewModel['album_art'])
+        elif propertyName == kn.album_art:
+            image = self.__images.getImage(viewModel[kn.uri], viewModel[kn.album_art])
             self.__showAlbumArt(image)
     
     def __formatDuration(self, time, showHours):
+        """ Format a duration or position.
+            If showHours is True the format is 'H:MM:SS', otherwise 'M:SS'. """
         hours, remainder = divmod(time.seconds, 3600)
         minutes, seconds = divmod(remainder, 60) 
         if showHours:
@@ -148,6 +139,7 @@ class CurrentTrackView(tk.Frame):
         return "%d:%02d" % (minutes, seconds)
 
     def __showAlbumArt(self, image):
+        """ SHow the specified imagee as album art. """
         if image is None:
             self._album_art.config(image = None)
             self.__image = None
