@@ -7,5 +7,5 @@ Working with SoCo version 0.11.1.
 
 Screenshot:
 <p>
-<img source="https://github.com/phuel/SoCo-Tk/tree/master/images/Screenshot.jpg"></img>
+<img source="images/Screenshot.jpg"></img>
 </p>
