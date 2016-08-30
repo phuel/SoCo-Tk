@@ -118,11 +118,11 @@ class PlayerViewModel(ViewModelBase):
         self.__updateAllowedCommands()
         baseUri = "http://%s:1400" % self.__soco.ip_address        
         self.CurrentTrack.update(event.variables['current_track_meta_data'], baseUri)
-        trackChanged = self.Queue.setCurrentTrack(event.variables['current_track'])
-        if trackChanged or self[kn.current_state] == "PLAYING":
+        trackChanged = self.Queue.setCurrentTrack(event.variables[kn.current_track])
+        if trackChanged or self[kn.current_state] == kn.PLAYING:
             track = self.__soco.get_current_track_info()
             self.CurrentTrack.start(track[kn.position])
-        elif self[kn.current_state] == "STOPPED":
+        elif self[kn.current_state] == kn.STOPPED:
             self.CurrentTrack.start("0:0:0")
 
     def __contentDirectoryEvent(self, event):
@@ -141,9 +141,9 @@ class PlayerViewModel(ViewModelBase):
     def __updateAllowedCommands(self):
         """ Update the state of the commands supported by this viwe model. """
         queueLen = self.Queue.length
-        self[kn.can_play] = queueLen > 0 and self[kn.current_state] in ( "STOPPED", "PAUSED_PLAYBACK" )
-        self[kn.can_pause] = self[kn.current_state] == "PLAYING"
-        self[kn.can_stop] = self[kn.current_state] == "PLAYING"
+        self[kn.can_play] = queueLen > 0 and self[kn.current_state] in ( kn.STOPPED, kn.PAUSED_PLAYBACK )
+        self[kn.can_pause] = self[kn.current_state] == kn.PLAYING
+        self[kn.can_stop] = self[kn.current_state] == kn.PLAYING
         self[kn.can_play_or_pause] = self[kn.can_play] or self[kn.can_pause]
         self[kn.can_go_next] = queueLen
         self[kn.can_go_previous] = queueLen

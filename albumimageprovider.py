@@ -11,10 +11,16 @@ except:
     Image = None
 
 class AlbumImageProvider(object):
+    """ The class loading album art from a URI or from the cache. """
+    
     def __init__(self, cache):
+        """ Constructor """
         self.__cache = cache
 
     def getImage(self, trackUri, imageUri):
+        """ Get an album art image.
+            trackUri : The track URI used as a key in the cache.
+            imageUri : The image URI. """
         if Image is None:
             return None
 

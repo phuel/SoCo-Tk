@@ -3,9 +3,12 @@ import os
 import sqlite3 as sql
 import contextlib as clib
 
-class AppSettings:
-
+class AppSettings(object):
+    """ Wrapper class for the application setting database. """
+    
     def __init__(self, path):
+        """ Constructor
+            Creates the database in the specified path if not already existing. """
         self.__dbPath = os.path.join(path, 'SoCo-Tk.sqlite')
         self._connection = None
 
@@ -27,6 +30,7 @@ class AppSettings:
             self._createSettingsDB()
 
     def setConfig(self, settingName, value):
+        """ Store a configuration value. """
         assert settingName is not None
 
         __sql = 'INSERT OR REPLACE INTO config (name, value) VALUES (?, ?)'
@@ -35,6 +39,7 @@ class AppSettings:
         self._connection.commit()
         
     def getConfig(self, settingName):
+        """ Get a settings value from the database. """
         assert settingName is not None
 
         __sql = 'SELECT value FROM config WHERE name = ? LIMIT 1'
@@ -48,12 +53,15 @@ class AppSettings:
             return row['value']
 
     def close(self):
+        """ Close the database. """
         if self._connection:
             logging.info('Closing database connection')
             self._connection.close()
             self._connection = None
 
     def tryGetImage(self, track_uri):
+        """ Try to get an album art image from the database.
+            track_uri : The track uri used as a key in the cache. """
         raw_data = None
         try:
             __sql = '''
@@ -73,6 +81,9 @@ class AppSettings:
         return raw_data
 
     def setImage(self, track_uri, raw_data):
+        """ Store an image in the database
+            track_uri : The track uri used as a key in the cache. 
+            raw_data  : The image data. """
         try:
             __sql = '''
                 INSERT OR REPLACE INTO images (
@@ -90,6 +101,7 @@ class AppSettings:
             logging.error(traceback.format_exc())
     
     def _createSettingsDB(self):
+        """ Create the settings database. """
         logging.debug('Creating tables')
         self._connection.executescript('''
             CREATE TABLE IF NOT EXISTS config(
@@ -115,4 +127,3 @@ class AppSettings:
         self._connection.execute('''
             CREATE INDEX IF NOT EXISTS idx_config_name ON config(name)
         ''').close()
-

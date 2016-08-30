@@ -146,7 +146,7 @@ class SonosList(tk.PanedWindow):
     def __onPropertyChanged(self, propertyName, viewModel):
         if propertyName == kn.current_state:
             self.__showSpeakerAndState(viewModel)
-            self._configurePlayOrPauseButton(viewModel[propertyName] != "PLAYING")
+            self._configurePlayOrPauseButton(viewModel[propertyName] != kn.PLAYING)
         elif propertyName == kn.volume:
             self._infoWidget[kn.volume].set(viewModel[propertyName])
         elif propertyName == kn.mute:
