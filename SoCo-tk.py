@@ -207,7 +207,7 @@ class SonosList(tk.PanedWindow):
 
     def __setSelectedSpeaker(self, speaker):
         if self.__currentSpeaker:
-            self.__currentSpeaker.unscubscribe()
+            self.__currentSpeaker.unsubscribe()
             self.__currentSpeaker.removeListener(self.__onPropertyChanged)
             self._currentTrackView.detachViewModel()
             self._queueView.detachViewModel()
